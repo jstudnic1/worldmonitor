@@ -472,7 +472,7 @@ export async function getRiskScores(
       },
     );
     if (result) {
-      setCachedJson(RISK_STALE_CACHE_KEY, result, RISK_STALE_TTL).catch(() => {});
+      await setCachedJson(RISK_STALE_CACHE_KEY, result, RISK_STALE_TTL).catch(() => {});
       return result;
     }
   } catch { /* upstream failed, fall through to stale */ }
