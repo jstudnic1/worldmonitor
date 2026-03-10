@@ -116,9 +116,22 @@ export async function searchImagery(
       CACHE_TTL,
       async () => {
 
-        const collections = req.source
-          ? COLLECTIONS.filter(c => c.toLowerCase().includes(req.source.toLowerCase()))
-          : COLLECTIONS;
+        const LEGACY_SOURCE_MAP: Record<string, string[]> = {
+          capella: COLLECTIONS,
+          'sentinel-1': ['sentinel-1-grd'],
+          'sentinel-2': ['sentinel-2-l2a'],
+        };
+        let collections = COLLECTIONS;
+        if (req.source) {
+          const src = req.source.toLowerCase();
+          const legacy = LEGACY_SOURCE_MAP[src];
+          if (legacy) {
+            collections = legacy;
+          } else {
+            const matched = COLLECTIONS.filter(c => c.toLowerCase().includes(src));
+            if (matched.length > 0) collections = matched;
+          }
+        }
 
         const body = {
           bbox: parsedBbox,
