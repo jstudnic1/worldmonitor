@@ -1,4 +1,5 @@
 import { Panel } from './Panel';
+import { getRpcBaseUrl } from '@/services/rpc-client';
 import { t } from '@/services/i18n';
 import { escapeHtml } from '@/utils/sanitize';
 import { MarketServiceClient } from '@/generated/client/worldmonitor/market/v1/service_client';
@@ -45,7 +46,7 @@ export class ETFFlowsPanel extends Panel {
     }
 
     try {
-      const client = new MarketServiceClient('', { fetch: (...args) => globalThis.fetch(...args) });
+      const client = new MarketServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
       this.data = await client.listEtfFlows({});
       if (!this.element?.isConnected) return;
       this.error = null;
