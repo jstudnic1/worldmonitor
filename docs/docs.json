@@ -4,7 +4,8 @@
   "name": "World Monitor Docs",
   "logo": {
     "dark": "/logo.png",
-    "light": "/logo.png"
+    "light": "/logo.png",
+    "href": "https://worldmonitor.app"
   },
   "favicon": "/favicon.png",
   "colors": {
@@ -17,6 +18,18 @@
       {
         "label": "Live App",
         "href": "https://worldmonitor.app"
+      },
+      {
+        "label": "Tech",
+        "href": "https://tech.worldmonitor.app"
+      },
+      {
+        "label": "Finance",
+        "href": "https://finance.worldmonitor.app"
+      },
+      {
+        "label": "Blog",
+        "href": "https://worldmonitor.app/blog"
       }
     ],
     "primary": {
@@ -198,6 +211,46 @@
   "footer": {
     "socials": {
       "github": "https://github.com/koala73/worldmonitor"
-    }
+    },
+    "links": [
+      {
+        "header": "World Monitor",
+        "items": [
+          {
+            "label": "Live App",
+            "href": "https://worldmonitor.app"
+          },
+          {
+            "label": "Tech Variant",
+            "href": "https://tech.worldmonitor.app"
+          },
+          {
+            "label": "Finance Variant",
+            "href": "https://finance.worldmonitor.app"
+          },
+          {
+            "label": "Happy Variant",
+            "href": "https://happy.worldmonitor.app"
+          }
+        ]
+      },
+      {
+        "header": "Resources",
+        "items": [
+          {
+            "label": "Blog",
+            "href": "https://worldmonitor.app/blog"
+          },
+          {
+            "label": "GitHub",
+            "href": "https://github.com/koala73/worldmonitor"
+          },
+          {
+            "label": "Pro",
+            "href": "https://worldmonitor.app/pro"
+          }
+        ]
+      }
+    ]
   }
 }
