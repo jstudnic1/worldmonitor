@@ -741,7 +741,7 @@ export class App {
     this.refreshScheduler.scheduleRefresh(
       'service-status',
       () => (this.state.panels['service-status'] as ServiceStatusPanel).fetchStatus(),
-      10 * 60_000,
+      3 * 60_000,
       () => this.isPanelNearViewport('service-status')
     );
     this.refreshScheduler.scheduleRefresh(
@@ -790,7 +790,7 @@ export class App {
     this.refreshScheduler.scheduleRefresh(
       'telegram-intel',
       () => this.dataLoader.loadTelegramIntel(),
-      5 * 60_000,
+      60 * 1_000,
       () => this.isPanelNearViewport('telegram-intel')
     );
 

@@ -705,9 +705,8 @@ export function installWebApiRedirect(): void {
   const nativeFetch = window.fetch.bind(window);
   const API_BASE = apiBase;
   const shouldRedirectPath = (pathWithQuery: string): boolean => pathWithQuery.startsWith('/api/');
-  const allowOriginFallback = !isWorldMonitorWebHost(window.location.hostname);
   const shouldFallbackToOrigin = (status: number): boolean => (
-    allowOriginFallback && (status === 404 || status === 405 || status === 501 || status === 502 || status === 503)
+    status === 404 || status === 405 || status === 501 || status === 502 || status === 503
   );
   const fetchWithRedirectFallback = async (
     redirectedInput: RequestInfo | URL,
@@ -719,8 +718,11 @@ export function installWebApiRedirect(): void {
       if (!shouldFallbackToOrigin(redirectedResponse.status)) return redirectedResponse;
       return nativeFetch(originalInput, originalInit);
     } catch (error) {
-      if (!allowOriginFallback) throw error;
-      return nativeFetch(originalInput, originalInit);
+      try {
+        return await nativeFetch(originalInput, originalInit);
+      } catch {
+        throw error;
+      }
     }
   };
 

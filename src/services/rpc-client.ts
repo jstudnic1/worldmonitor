@@ -1,9 +1,7 @@
-import { getApiBaseUrl, getConfiguredWebApiBaseUrl } from '@/services/runtime';
+import { getConfiguredWebApiBaseUrl } from '@/services/runtime';
 
 export function getRpcBaseUrl(): string {
-  return getApiBaseUrl() || getConfiguredWebApiBaseUrl() || '';
-}
-
-export function rpcFetch(...args: Parameters<typeof globalThis.fetch>): ReturnType<typeof globalThis.fetch> {
-  return globalThis.fetch(...args);
+  // Desktop keeps a relative base so installRuntimeFetchPatch() can resolve the
+  // latest sidecar port per request instead of freezing a stale module-load port.
+  return getConfiguredWebApiBaseUrl() || '';
 }
