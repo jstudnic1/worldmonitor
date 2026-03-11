@@ -308,7 +308,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   private isPerFeedFallbackEnabled(): boolean {
-    return isFeatureEnabled('newsPerFeedFallback') && !this.ctx.initialLoadComplete;
+    return isFeatureEnabled('newsPerFeedFallback');
   }
 
   private getStaleNewsItems(category: string): NewsItem[] {

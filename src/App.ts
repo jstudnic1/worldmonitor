@@ -64,6 +64,15 @@ export class App {
 
   private modules: { destroy(): void }[] = [];
   private unsubAiFlow: (() => void) | null = null;
+  private visiblePanelPrimed = new Set<string>();
+  private visiblePanelPrimeRaf: number | null = null;
+  private readonly handleViewportPrime = (): void => {
+    if (this.visiblePanelPrimeRaf !== null) return;
+    this.visiblePanelPrimeRaf = window.requestAnimationFrame(() => {
+      this.visiblePanelPrimeRaf = null;
+      void this.primeVisiblePanelData();
+    });
+  };
 
   private isPanelNearViewport(panelId: string, marginPx = 400): boolean {
     const panel = this.state.panels[panelId] as { isNearViewport?: (marginPx?: number) => boolean } | undefined;
@@ -76,29 +85,42 @@ export class App {
 
   private async primeVisiblePanelData(): Promise<void> {
     const tasks: Promise<unknown>[] = [];
+    const primeTask = (key: string, task: () => Promise<unknown>): void => {
+      if (this.visiblePanelPrimed.has(key) || this.state.inFlight.has(key)) return;
+      const wrapped = (async () => {
+        this.state.inFlight.add(key);
+        try {
+          await task();
+          this.visiblePanelPrimed.add(key);
+        } finally {
+          this.state.inFlight.delete(key);
+        }
+      })();
+      tasks.push(wrapped);
+    };
 
     if (this.isPanelNearViewport('service-status')) {
       const panel = this.state.panels['service-status'] as ServiceStatusPanel | undefined;
-      if (panel) tasks.push(panel.fetchStatus());
+      if (panel) primeTask('service-status', () => panel.fetchStatus());
     }
     if (this.isPanelNearViewport('macro-signals')) {
       const panel = this.state.panels['macro-signals'] as MacroSignalsPanel | undefined;
-      if (panel) tasks.push(panel.fetchData());
+      if (panel) primeTask('macro-signals', () => panel.fetchData());
     }
     if (this.isPanelNearViewport('etf-flows')) {
       const panel = this.state.panels['etf-flows'] as ETFFlowsPanel | undefined;
-      if (panel) tasks.push(panel.fetchData());
+      if (panel) primeTask('etf-flows', () => panel.fetchData());
     }
     if (this.isPanelNearViewport('stablecoins')) {
       const panel = this.state.panels['stablecoins'] as StablecoinPanel | undefined;
-      if (panel) tasks.push(panel.fetchData());
+      if (panel) primeTask('stablecoins', () => panel.fetchData());
     }
     if (this.isPanelNearViewport('telegram-intel')) {
-      tasks.push(this.dataLoader.loadTelegramIntel());
+      primeTask('telegramIntel', () => this.dataLoader.loadTelegramIntel());
     }
     if (this.isPanelNearViewport('gulf-economies')) {
       const panel = this.state.panels['gulf-economies'] as GulfEconomiesPanel | undefined;
-      if (panel) tasks.push(panel.fetchData());
+      if (panel) primeTask('gulf-economies', () => panel.fetchData());
     }
 
     if (tasks.length > 0) {
@@ -532,6 +554,8 @@ export class App {
     await preloadCountryGeometry();
     await this.dataLoader.loadAllData();
     await this.primeVisiblePanelData();
+    window.addEventListener('scroll', this.handleViewportPrime, { passive: true });
+    window.addEventListener('resize', this.handleViewportPrime);
 
     startLearning();
 
@@ -564,6 +588,12 @@ export class App {
 
   public destroy(): void {
     this.state.isDestroyed = true;
+    window.removeEventListener('scroll', this.handleViewportPrime);
+    window.removeEventListener('resize', this.handleViewportPrime);
+    if (this.visiblePanelPrimeRaf !== null) {
+      window.cancelAnimationFrame(this.visiblePanelPrimeRaf);
+      this.visiblePanelPrimeRaf = null;
+    }
 
     // Destroy all modules in reverse order
     for (let i = this.modules.length - 1; i >= 0; i--) {
