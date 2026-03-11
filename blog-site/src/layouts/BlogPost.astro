@@ -16,14 +16,58 @@ const formattedDate = pubDate.toLocaleDateString('en-US', {
   month: 'short',
   day: 'numeric',
 });
+const isoDate = pubDate.toISOString();
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": metaTitle || title,
+  "description": description,
+  "datePublished": isoDate,
+  "dateModified": isoDate,
+  "author": {
+    "@type": "Organization",
+    "name": "WorldMonitor",
+    "url": "https://worldmonitor.app",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://www.worldmonitor.app/favico/apple-touch-icon.png"
+    }
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "WorldMonitor",
+    "url": "https://worldmonitor.app",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://www.worldmonitor.app/favico/apple-touch-icon.png"
+    }
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": Astro.url.href
+  },
+  "image": "https://www.worldmonitor.app/favico/og-image.png",
+  "url": Astro.url.href,
+  ...(keywords ? { "keywords": keywords } : {})
+};
 ---
 
-<Base title={title} description={description} metaTitle={metaTitle} keywords={keywords}>
+<Base
+  title={title}
+  description={description}
+  metaTitle={metaTitle}
+  keywords={keywords}
+  ogType="article"
+  publishedTime={isoDate}
+  modifiedTime={isoDate}
+  jsonLd={jsonLd}
+>
   <article>
     <div class="article-header">
       <a href="/blog/" class="back">&larr; All articles</a>
       <div class="meta">
-        <time datetime={pubDate.toISOString()}>{formattedDate}</time>
+        <time datetime={isoDate}>{formattedDate}</time>
         {audience && <span> &middot; {audience}</span>}
       </div>
     </div>
