@@ -83,6 +83,13 @@ Layers are organized into logical groups for efficient monitoring:
 | **Economic** | Tabbed economic panel with FRED indicators, EIA oil analytics, and USASpending.gov government contracts |
 | **Countries** | Country boundary labels |
 | **Waterways** | Strategic waterways and chokepoints |
+| **Trade Routes** | 19 global trade routes (container, energy, bulk) with multi-segment arcs through strategic chokepoints |
+| **Fires (FIRMS)** | NASA FIRMS satellite fire detection (VIIRS thermal hotspots) for wildfire and operational risk monitoring |
+
+**Webcams**
+| Layer | Description |
+|-------|-------------|
+| **Live Webcams** | 22 live streams across 5 geopolitical regions (Middle East, Eastern Europe, Asia-Pacific, Africa, Americas) with automatic fallback handling |
 
 ## Intelligence Panels
 
@@ -96,6 +103,14 @@ Beyond raw data feeds, the dashboard provides synthesized intelligence panels:
 | **Infrastructure Cascade** | Dependency analysis for cables, pipelines, and chokepoints |
 | **Live Intelligence** | GDELT-powered topic feeds (Military, Cyber, Nuclear, Sanctions) |
 | **Intel Feed** | Curated defense and security news sources |
+| **Country Brief** | AI-generated country profiles with key indicators, risk factors, and recent developments |
+| **Aviation Intelligence** | 6-tab aviation panel (Ops, Flights, Airlines, Tracking, News, Prices) with NOTAM closure detection across 111 monitored airports |
+| **Climate Anomalies** | Temperature and precipitation deviations across 15 zones using Open-Meteo ERA5 data against rolling baselines |
+| **Displacement Tracking** | UN OCHA HAPI refugee, asylum seeker, and IDP data with origin/host country perspectives |
+| **Gulf Economies** | Indices, currencies, and oil data for 6 GCC countries (Saudi, UAE, Qatar, Kuwait, Bahrain, Oman) |
+| **WTO Trade Policy** | Active trade restrictions, tariff trends, bilateral trade flows, and SPS/TBT barriers |
+| **Central Banks & BIS** | Policy rates and monetary decisions from 13 central banks via BIS data |
+| **Market Watchlist** | User-defined stock/commodity/crypto symbol lists (up to 50 symbols) |
 
 These panels transform raw signals into actionable intelligence by applying scoring algorithms, trend detection, and cross-source correlation.
 
@@ -564,6 +579,18 @@ Layers disabled by default on mobile (but available on desktop):
 - Protests, economic centers
 
 This curated set provides situational awareness without overwhelming the interface or consuming excessive data/battery.
+
+---
+
+## Offline ML Capabilities
+
+The dashboard includes browser-side machine learning that works without any server connection:
+
+- **Threat Classification** - Three-stage pipeline (keyword pre-filter, browser ML model, optional LLM refinement) classifies news headlines by threat category
+- **Headline Scoring** - ML-based importance scoring for news articles, enabling priority-based rendering
+- **Entity Extraction** - Client-side named entity recognition for identifying countries, organizations, and key figures in headlines
+
+These models run entirely in the browser via Web Workers, providing intelligence analysis capabilities even when offline or when API keys are not configured.
 
 ---
 
