@@ -33,18 +33,6 @@ const DEV_EVENTS_RSS = 'https://dev.events/rss.xml';
 // Curated major tech events that may fall off limited RSS feeds
 const CURATED_EVENTS: TechEvent[] = [
   {
-    id: 'step-dubai-2026',
-    title: 'STEP Dubai 2026',
-    type: 'conference',
-    location: 'Dubai Internet City, Dubai',
-    coords: { lat: 25.0956, lng: 55.1548, country: 'UAE', original: 'Dubai Internet City, Dubai', virtual: false },
-    startDate: '2026-02-11',
-    endDate: '2026-02-12',
-    url: 'https://dubai.stepconference.com',
-    source: 'curated',
-    description: 'Intelligence Everywhere: The AI Economy - 8,000+ attendees, 400+ startups',
-  },
-  {
     id: 'gitex-global-2026',
     title: 'GITEX Global 2026',
     type: 'conference',
@@ -272,13 +260,18 @@ async function fetchTechEvents(req: ListTechEventsRequest): Promise<ListTechEven
   ]);
 
   let events: TechEvent[] = [];
+  let externalSourcesFailed = 0;
 
   // Parse Techmeme ICS
   if (icsResponse.status === 'fulfilled' && icsResponse.value.ok) {
     const icsText = await icsResponse.value.text();
-    events.push(...parseICS(icsText));
+    const parsed = parseICS(icsText);
+    events.push(...parsed);
+    console.log(`[tech-events] Techmeme ICS: ${parsed.length} events parsed`);
   } else {
-    console.warn('Failed to fetch Techmeme ICS');
+    externalSourcesFailed++;
+    const reason = icsResponse.status === 'rejected' ? icsResponse.reason?.message : `HTTP ${(icsResponse as PromiseFulfilledResult<Response>).value?.status}`;
+    console.warn(`[tech-events] Techmeme ICS fetch failed: ${reason}`);
   }
 
   // Parse dev.events RSS
@@ -286,8 +279,11 @@ async function fetchTechEvents(req: ListTechEventsRequest): Promise<ListTechEven
     const rssText = await rssResponse.value.text();
     const devEvents = parseDevEventsRSS(rssText);
     events.push(...devEvents);
+    console.log(`[tech-events] dev.events RSS: ${devEvents.length} events parsed`);
   } else {
-    console.warn('Failed to fetch dev.events RSS');
+    externalSourcesFailed++;
+    const reason = rssResponse.status === 'rejected' ? rssResponse.reason?.message : `HTTP ${(rssResponse as PromiseFulfilledResult<Response>).value?.status}`;
+    console.warn(`[tech-events] dev.events RSS fetch failed: ${reason}`);
   }
 
   // Add curated events (major conferences that may fall off limited RSS feeds)
@@ -339,6 +335,10 @@ async function fetchTechEvents(req: ListTechEventsRequest): Promise<ListTechEven
   const conferences = events.filter(e => e.type === 'conference');
   const mappableCount = conferences.filter(e => e.coords && !e.coords.virtual).length;
 
+  if (externalSourcesFailed > 0) {
+    console.warn(`[tech-events] ${externalSourcesFailed}/2 external sources failed, returning ${events.length} events (curated fallback)`);
+  }
+
   return {
     success: true,
     count: events.length,
@@ -365,10 +365,9 @@ export async function listTechEvents(
 ): Promise<ListTechEventsResponse> {
   try {
     const cacheKey = `${REDIS_CACHE_KEY}:${req.type || 'all'}:${req.mappable ? 1 : 0}:${req.days || 0}`;
-    const MIN_EVENTS = 5; // at least curated count; avoid caching partial failures
     const result = await cachedFetchJson<ListTechEventsResponse>(cacheKey, REDIS_CACHE_TTL, async () => {
       const fetched = await fetchTechEvents({ ...req, limit: 0 });
-      return fetched.events.length >= MIN_EVENTS ? fetched : null;
+      return fetched.events.length > 0 ? fetched : null;
     });
     if (!result) {
       return { success: true, count: 0, conferenceCount: 0, mappableCount: 0, lastUpdated: new Date().toISOString(), events: [], error: '' };
