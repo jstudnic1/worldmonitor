@@ -60,7 +60,7 @@ import type { CountryClickPayload } from './DeckGLMap';
 import { t } from '@/services/i18n';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
-export type MapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
+export type MapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania' | 'czechia';
 
 interface MapState {
   zoom: number;
@@ -3083,6 +3083,7 @@ export class MapComponent {
       latam: { zoom: 2.0, pan: { x: 120, y: -100 } },
       africa: { zoom: 2.2, pan: { x: -40, y: -30 } },
       oceania: { zoom: 2.2, pan: { x: -420, y: -100 } },
+      czechia: { zoom: 6.2, pan: { x: -18, y: 18 } },
     };
 
     const settings = viewSettings[view];

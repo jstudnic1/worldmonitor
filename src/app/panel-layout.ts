@@ -25,6 +25,7 @@ import {
   ServiceStatusPanel,
   RuntimeConfigPanel,
   InsightsPanel,
+  CzechMonitorPanel,
   MacroSignalsPanel,
   ETFFlowsPanel,
   StablecoinPanel,
@@ -170,6 +171,10 @@ export class PanelLayoutManager implements AppModule {
               <span class="variant-label">Good News</span>
             </a>`;
       })()}</div>
+          ${SITE_VARIANT === 'full' ? `<div class="geo-focus-switcher" id="geoFocusSwitcher">
+            <button class="geo-focus-btn active" data-focus-view="global">${t('header.world')}</button>
+            <button class="geo-focus-btn" data-focus-view="czechia">${t('header.czechia')}</button>
+          </div>` : ''}
           <span class="logo">MONITOR</span><span class="logo-mobile">World Monitor</span><span class="version">v${__APP_VERSION__}</span>${BETA_MODE ? '<span class="beta-badge">BETA</span>' : ''}
           <a href="https://x.com/eliehabib" target="_blank" rel="noopener" class="credit-link">
             <svg class="x-logo" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
@@ -188,6 +193,7 @@ export class PanelLayoutManager implements AppModule {
           <div class="region-selector">
             <select id="regionSelect" class="region-select">
               <option value="global">${t('components.deckgl.views.global')}</option>
+              <option value="czechia">${t('components.deckgl.views.czechia')}</option>
               <option value="america">${t('components.deckgl.views.americas')}</option>
               <option value="mena">${t('components.deckgl.views.mena')}</option>
               <option value="eu">${t('components.deckgl.views.europe')}</option>
@@ -269,6 +275,7 @@ export class PanelLayoutManager implements AppModule {
         <div class="region-sheet-divider"></div>
         ${[
         { value: 'global', label: t('components.deckgl.views.global') },
+        { value: 'czechia', label: t('components.deckgl.views.czechia') },
         { value: 'america', label: t('components.deckgl.views.americas') },
         { value: 'mena', label: t('components.deckgl.views.mena') },
         { value: 'eu', label: t('components.deckgl.views.europe') },
@@ -525,6 +532,21 @@ export class PanelLayoutManager implements AppModule {
 
     this.createNewsPanel('gov', 'panels.gov');
     this.createNewsPanel('intel', 'panels.intel');
+
+    if (this.shouldCreatePanel('czech-monitor')) {
+      const czechMonitorPanel = new CzechMonitorPanel();
+      czechMonitorPanel.setMapFocusHandler((lat, lon, zoom) => {
+        this.ctx.map?.setCenter(lat, lon, zoom);
+        this.ctx.map?.flashLocation(lat, lon, 2500);
+      });
+      czechMonitorPanel.setViewHandler((view) => {
+        this.ctx.map?.setView(view);
+      });
+      czechMonitorPanel.setCountryBriefHandler((code) => {
+        this.callbacks.openCountryBrief(code);
+      });
+      this.ctx.panels['czech-monitor'] = czechMonitorPanel;
+    }
 
     this.createPanel('crypto', () => new CryptoPanel());
     this.createNewsPanel('middleeast', 'panels.middleeast');

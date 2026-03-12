@@ -32,6 +32,7 @@ export const LAYER_KEY_MAP: Record<string, keyof MapLayers> = {
 export const COMMANDS: Command[] = [
   // Navigation (region switching)
   { id: 'nav:global', keywords: ['global', 'world', 'reset', 'home'], label: 'Map: Global view', icon: '\u{1F30D}', category: 'navigate' },
+  { id: 'nav:czechia', keywords: ['czechia', 'czech republic', 'czech', 'prague'], label: 'Map: Czechia', icon: '\u{1F1E8}\u{1F1FF}', category: 'navigate' },
   { id: 'nav:mena', keywords: ['mena', 'middle east', 'mideast'], label: 'Map: Middle East & North Africa', icon: '\u{1F54C}', category: 'navigate' },
   { id: 'nav:eu', keywords: ['europe', 'eu'], label: 'Map: Europe', icon: '\u{1F3F0}', category: 'navigate' },
   { id: 'nav:asia', keywords: ['asia', 'pacific'], label: 'Map: Asia-Pacific', icon: '\u{1F3EF}', category: 'navigate' },
@@ -93,6 +94,7 @@ export const COMMANDS: Command[] = [
   { id: 'panel:politics', keywords: ['world news', 'politics', 'geopolitics'], label: 'Panel: World News', icon: '\u{1F30D}', category: 'panels' },
   { id: 'panel:us', keywords: ['united states', 'us news', 'america news'], label: 'Panel: United States', icon: '\u{1F1FA}\u{1F1F8}', category: 'panels' },
   { id: 'panel:europe', keywords: ['europe news', 'eu news'], label: 'Panel: Europe', icon: '\u{1F1EA}\u{1F1FA}', category: 'panels' },
+  { id: 'panel:czech-monitor', keywords: ['czech monitor', 'czech republic', 'czechia', 'prague monitor'], label: 'Panel: Czech Monitor', icon: '\u{1F1E8}\u{1F1FF}', category: 'panels' },
   { id: 'panel:middleeast', keywords: ['middle east news', 'mideast news'], label: 'Panel: Middle East', icon: '\u{1F54C}', category: 'panels' },
   { id: 'panel:africa', keywords: ['africa news'], label: 'Panel: Africa', icon: '\u{1F30D}', category: 'panels' },
   { id: 'panel:latam', keywords: ['latin america news', 'latam news'], label: 'Panel: Latin America', icon: '\u{1F30E}', category: 'panels' },

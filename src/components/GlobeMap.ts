@@ -1946,6 +1946,7 @@ export class GlobeMap {
     latam:    { lat: -15, lng: -60,  altitude: 1.5 },
     africa:   { lat:  5,  lng:  20,  altitude: 1.5 },
     oceania:  { lat: -25, lng: 140,  altitude: 1.5 },
+    czechia:  { lat: 49.85, lng: 15.5, altitude: 0.22 },
   };
 
   public setView(view: MapView): void {

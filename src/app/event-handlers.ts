@@ -48,6 +48,7 @@ import type { Platform } from '@/components/DownloadBanner';
 import { invokeTauri } from '@/services/tauri-bridge';
 import { dataFreshness } from '@/services/data-freshness';
 import { mlWorker } from '@/services/ml-worker';
+import { setFocusView } from '@/services/focus-view';
 import { UnifiedSettings } from '@/components/UnifiedSettings';
 import { t } from '@/services/i18n';
 import { TvModeController } from '@/services/tv-mode';
@@ -100,6 +101,14 @@ export class EventHandlerManager implements AppModule {
   constructor(ctx: AppContext, callbacks: EventHandlerCallbacks) {
     this.ctx = ctx;
     this.callbacks = callbacks;
+  }
+
+  private updateGeoFocusButtons(view: MapView): void {
+    this.ctx.container.querySelectorAll<HTMLButtonElement>('.geo-focus-btn').forEach((btn) => {
+      const buttonView = btn.dataset.focusView as MapView | undefined;
+      const isActive = buttonView === 'czechia' ? view === 'czechia' : view !== 'czechia';
+      btn.classList.toggle('active', isActive);
+    });
   }
 
   init(): void {
@@ -320,8 +329,34 @@ export class EventHandlerManager implements AppModule {
 
     const regionSelect = document.getElementById('regionSelect') as HTMLSelectElement;
     regionSelect?.addEventListener('change', () => {
-      this.ctx.map?.setView(regionSelect.value as MapView);
-      trackMapViewChange(regionSelect.value);
+      const view = regionSelect.value as MapView;
+      this.ctx.map?.setView(view);
+      setFocusView(view);
+      this.updateGeoFocusButtons(view);
+      trackMapViewChange(view);
+    });
+
+    this.ctx.container.querySelectorAll<HTMLButtonElement>('.geo-focus-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const view = btn.dataset.focusView as MapView | undefined;
+        if (!view) return;
+        this.ctx.map?.setView(view);
+        setFocusView(view);
+        this.updateGeoFocusButtons(view);
+        trackMapViewChange(view);
+
+        if (view === 'czechia') {
+          document.querySelector<HTMLElement>('[data-panel="czech-monitor"]')?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        } else if (view === 'global') {
+          document.getElementById('mapSection')?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }
+      });
     });
 
     this.boundResizeHandler = debounce(() => {
@@ -438,6 +473,8 @@ export class EventHandlerManager implements AppModule {
         const region = opt.dataset.region;
         if (!region) return;
         this.ctx.map?.setView(region as MapView);
+        setFocusView(region as MapView);
+        this.updateGeoFocusButtons(region as MapView);
         trackMapViewChange(region);
         const regionSelect = document.getElementById('regionSelect') as HTMLSelectElement;
         if (regionSelect) regionSelect.value = region;
@@ -533,6 +570,14 @@ export class EventHandlerManager implements AppModule {
   setupUrlStateSync(): void {
     if (!this.ctx.map) return;
 
+    const initialState = this.ctx.map.getState();
+    setFocusView(initialState.view);
+    this.updateGeoFocusButtons(initialState.view);
+    const initialRegionSelect = document.getElementById('regionSelect') as HTMLSelectElement | null;
+    if (initialRegionSelect && initialRegionSelect.value !== initialState.view) {
+      initialRegionSelect.value = initialState.view;
+    }
+
     this.ctx.map.onStateChanged(() => {
       this.debouncedUrlSync();
       const regionSelect = document.getElementById('regionSelect') as HTMLSelectElement;
@@ -541,6 +586,8 @@ export class EventHandlerManager implements AppModule {
         if (regionSelect.value !== state.view) {
           regionSelect.value = state.view;
         }
+        setFocusView(state.view);
+        this.updateGeoFocusButtons(state.view);
       }
     });
     this.debouncedUrlSync();

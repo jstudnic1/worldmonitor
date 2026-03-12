@@ -137,6 +137,7 @@
   },
   "header": {
     "world": "WORLD",
+    "czechia": "CZECHIA",
     "tech": "TECH",
     "live": "LIVE",
     "search": "Search",
@@ -229,6 +230,7 @@
     "politics": "World News",
     "us": "United States",
     "europe": "Europe",
+    "czechMonitor": "Czech Monitor",
     "middleeast": "Middle East",
     "africa": "Africa",
     "latam": "Latin America",
@@ -685,6 +687,7 @@
         "all": "ALL",
         "mideast": "MIDEAST",
         "europe": "EUROPE",
+        "czechia": "CZECHIA",
         "americas": "AMERICAS",
         "asia": "ASIA",
         "space": "SPACE"
@@ -796,6 +799,102 @@
       "topProducers": "Top Producers",
       "risk": "Risk",
       "sources": "FRED / NGA / USGS"
+    },
+    "czechMonitor": {
+      "loading": "Loading Czech monitor...",
+      "loadFailed": "Failed to load Czech monitoring data",
+      "waiting": "Waiting for first update",
+      "updated": "Updated {{time}}",
+      "sourceSummary": "{{count}} Czech news feeds",
+      "tabs": {
+        "overview": "Overview",
+        "news": "News",
+        "markets": "Markets",
+        "watch": "Watchpoints",
+        "live": "Live"
+      },
+      "cards": {
+        "time": "Prague time",
+        "timeDetail": "Local time in Central Europe",
+        "headlines": "Headlines",
+        "headlinesDetail": "Czech stories collected in the latest refresh",
+        "index": "PX Prague",
+        "fx": "Koruna FX"
+      },
+      "focusMap": "Focus Czechia",
+      "openBrief": "Open country brief",
+      "latestHeadlines": "Latest headlines",
+      "newsSectionTitle": "Czech news stream",
+      "watchSectionTitle": "Key Czech watchpoints",
+      "focusPoint": "Focus map",
+      "noNews": "No Czech headlines available right now",
+      "noMarketData": "No Czech market data available",
+      "indexDetail": "Weekly move in {{currency}}",
+      "quoteDetails": {
+        "eur": "Euro versus Czech koruna",
+        "usd": "US dollar versus Czech koruna",
+        "cez": "CEZ on Prague Stock Exchange",
+        "kb": "Komercni banka on Prague Stock Exchange",
+        "moneta": "Moneta Money Bank on Prague Stock Exchange"
+      },
+      "watchpoints": {
+        "prague": {
+          "title": "Prague",
+          "description": "Government, markets, transport, and major headlines",
+          "tag": "Capital"
+        },
+        "brno": {
+          "title": "Brno",
+          "description": "Industry, courts, universities, and regional tech activity",
+          "tag": "Region"
+        },
+        "temelin": {
+          "title": "Temelin Nuclear Plant",
+          "description": "Energy security, grid risk, and infrastructure incidents",
+          "tag": "Energy"
+        },
+        "dukovany": {
+          "title": "Dukovany Nuclear Plant",
+          "description": "Expansion, maintenance windows, and power reliability",
+          "tag": "Nuclear"
+        },
+        "ostrava": {
+          "title": "Ostrava",
+          "description": "Heavy industry, logistics, air quality, and labor signals",
+          "tag": "Industry"
+        },
+        "airport": {
+          "title": "Vaclav Havel Airport",
+          "description": "Flights, travel disruptions, and airspace issues",
+          "tag": "Aviation"
+        }
+      },
+      "live": {
+        "openBroadcastPanel": "Open live broadcasts panel",
+        "openWebcamsPanel": "Open Czech webcams panel",
+        "broadcastSection": "Live broadcasts",
+        "cameraSection": "Live cameras",
+        "watchLive": "Watch live",
+        "openCamera": "Open camera",
+        "tags": {
+          "tv": "TV",
+          "radio": "Radio",
+          "camera": "Camera",
+          "transport": "Transit",
+          "city": "City"
+        },
+        "broadcasts": {
+          "ct24": "Public broadcaster live stream hub for CT24 coverage",
+          "cnnPrima": "Czech rolling news channel with live domestic coverage",
+          "radiozurnal": "Continuous Czech radio news coverage from Cesky rozhlas"
+        },
+        "cameras": {
+          "airport": "Official Prague Airport live camera and planespotting view",
+          "mainStation": "Prague hlavni nadrazi live rail camera",
+          "oldTown": "Historic center webcam covering the Prague old town area",
+          "panorama": "Wide Prague skyline view for citywide situational awareness"
+        }
+      }
     },
     "tradePolicy": {
       "restrictions": "Restrictions",
@@ -1019,6 +1118,7 @@
       "timeAll": "All",
       "views": {
         "global": "Global",
+        "czechia": "Czechia",
         "americas": "Americas",
         "mena": "MENA",
         "europe": "Europe",
@@ -1713,6 +1813,7 @@
       "regionAll": "All",
       "regionNorthAmerica": "North America",
       "regionEurope": "Europe",
+      "regionCzechia": "Czechia",
       "regionLatinAmerica": "Latin America",
       "regionAsia": "Asia",
       "regionMiddleEast": "Middle East",

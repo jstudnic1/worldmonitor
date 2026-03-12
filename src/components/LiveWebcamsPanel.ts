@@ -7,8 +7,9 @@ import { trackWebcamSelected, trackWebcamRegionFiltered } from '@/services/analy
 import { getStreamQuality, subscribeStreamQualityChange } from '@/services/ai-flow-settings';
 import { isMobileDevice } from '@/utils';
 import { getLiveStreamsAlwaysOn, subscribeLiveStreamsSettingsChange } from '@/services/live-stream-settings';
+import { getFocusView, subscribeFocusView } from '@/services/focus-view';
 
-type WebcamRegion = 'iran' | 'middle-east' | 'europe' | 'asia' | 'americas' | 'space';
+type WebcamRegion = 'iran' | 'middle-east' | 'europe' | 'asia' | 'americas' | 'space' | 'czechia';
 
 interface WebcamFeed {
   id: string;
@@ -39,6 +40,9 @@ const WEBCAM_FEEDS: WebcamFeed[] = [
   { id: 'paris', city: 'Paris', country: 'France', region: 'europe', channelHandle: '@PalaisIena', fallbackVideoId: 'OzYp4NRZlwQ' },
   { id: 'st-petersburg', city: 'St. Petersburg', country: 'Russia', region: 'europe', channelHandle: '@SPBLiveCam', fallbackVideoId: 'CjtIYbmVfck' },
   { id: 'london', city: 'London', country: 'UK', region: 'europe', channelHandle: '@EarthCam', fallbackVideoId: 'Lxqcg1qt0XU' },
+  // Czech Republic
+  { id: 'prague-airport', city: 'Prague Airport', country: 'Czech Republic', region: 'czechia', channelHandle: '@prgairport', fallbackVideoId: '0jUGiYZKAMg' },
+  { id: 'prague-main-station', city: 'Prague Main Station', country: 'Czech Republic', region: 'czechia', channelHandle: '@hlavninadrazipraha', fallbackVideoId: 'iWkGwIv20WI' },
   // Americas
   { id: 'washington', city: 'Washington DC', country: 'USA', region: 'americas', channelHandle: '@AxisCommunications', fallbackVideoId: '1wV9lLe14aU' },
   { id: 'new-york', city: 'New York', country: 'USA', region: 'americas', channelHandle: '@EarthCam', fallbackVideoId: '4qyZLflp-sI' },
@@ -75,7 +79,7 @@ interface WebcamIframeTracker {
 
 export class LiveWebcamsPanel extends Panel {
   private viewMode: ViewMode = 'grid';
-  private regionFilter: RegionFilter = 'iran';
+  private regionFilter: RegionFilter = getFocusView() === 'czechia' ? 'czechia' : 'iran';
   private activeFeed: WebcamFeed = WEBCAM_FEEDS[0]!;
   private toolbar: HTMLElement | null = null;
   private iframes: HTMLIFrameElement[] = [];
@@ -90,6 +94,7 @@ export class LiveWebcamsPanel extends Panel {
   private isIdle = false;
   private alwaysOn = getLiveStreamsAlwaysOn();
   private unsubscribeStreamSettings: (() => void) | null = null;
+  private unsubscribeFocusView: (() => void) | null = null;
 
   // UI
   private fullscreenBtn: HTMLButtonElement | null = null;
@@ -115,8 +120,19 @@ export class LiveWebcamsPanel extends Panel {
       this.alwaysOn = alwaysOn;
       this.applyIdleMode();
     });
+    this.unsubscribeFocusView = subscribeFocusView((view) => {
+      if (view === 'czechia' && this.regionFilter !== 'czechia') {
+        this.setRegionFilter('czechia');
+        return;
+      }
+      if (view !== 'czechia' && this.regionFilter === 'czechia') {
+        this.setRegionFilter('all');
+      }
+    });
     this.boundEmbedMessageHandler = (e) => this.handleEmbedMessage(e);
     window.addEventListener('message', this.boundEmbedMessageHandler);
+    const initialFeed = this.filteredFeeds[0];
+    if (initialFeed) this.activeFeed = initialFeed;
     this.render();
     document.addEventListener('keydown', this.boundFullscreenEscHandler);
   }
@@ -178,6 +194,7 @@ export class LiveWebcamsPanel extends Panel {
       { key: 'all', label: t('components.webcams.regions.all') },
       { key: 'middle-east', label: t('components.webcams.regions.mideast') },
       { key: 'europe', label: t('components.webcams.regions.europe') },
+      { key: 'czechia', label: t('components.webcams.regions.czechia') },
       { key: 'americas', label: t('components.webcams.regions.americas') },
       { key: 'asia', label: t('components.webcams.regions.asia') },
       { key: 'space', label: t('components.webcams.regions.space') },
@@ -659,6 +676,8 @@ export class LiveWebcamsPanel extends Panel {
     this.observer?.disconnect();
     this.unsubscribeStreamSettings?.();
     this.unsubscribeStreamSettings = null;
+    this.unsubscribeFocusView?.();
+    this.unsubscribeFocusView = null;
     this.destroyIframes();
     super.destroy();
   }

@@ -387,6 +387,42 @@ canvas,
   opacity: 1;
 }
 
+.geo-focus-switcher {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  background: var(--overlay-subtle);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.geo-focus-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.geo-focus-btn:hover {
+  color: var(--text);
+  background: var(--overlay-subtle);
+}
+
+.geo-focus-btn.active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
 .logo {
   font-weight: bold;
   font-size: 14px;
@@ -10501,6 +10537,7 @@ a.prediction-link:hover {
   }
 
   .variant-switcher,
+  .geo-focus-switcher,
   .version,
   .beta-badge,
   .credit-link,

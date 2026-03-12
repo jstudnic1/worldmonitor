@@ -137,6 +137,7 @@
   },
   "header": {
     "world": "SVĚT",
+    "czechia": "ČESKO",
     "tech": "TECH",
     "live": "ŽIVĚ",
     "search": "Hledat",
@@ -223,6 +224,7 @@
     "politics": "Světové zprávy",
     "us": "Spojené státy",
     "europe": "Evropa",
+    "czechMonitor": "Monitoring Česka",
     "middleeast": "Blízký východ",
     "africa": "Afrika",
     "latam": "Latinská Amerika",
@@ -674,6 +676,7 @@
         "all": "VŠE",
         "mideast": "BLÍZKÝ VÝCHOD",
         "europe": "EVROPA",
+        "czechia": "ČESKO",
         "americas": "AMERIKA",
         "asia": "ASIE",
         "space": "VESMÍR"
@@ -764,6 +767,102 @@
       "risk": "Riziko",
       "sources": "FRED / NGA / USGS",
       "aisDisruptions": "Poruchy AIS"
+    },
+    "czechMonitor": {
+      "loading": "Načítám monitoring Česka...",
+      "loadFailed": "Nepodařilo se načíst data pro monitoring Česka",
+      "waiting": "Čekám na první aktualizaci",
+      "updated": "Aktualizováno {{time}}",
+      "sourceSummary": "{{count}} českých zpravodajských zdrojů",
+      "tabs": {
+        "overview": "Přehled",
+        "news": "Zprávy",
+        "markets": "Trhy",
+        "watch": "Body",
+        "live": "Živě"
+      },
+      "cards": {
+        "time": "Pražský čas",
+        "timeDetail": "Místní čas ve střední Evropě",
+        "headlines": "Titulky",
+        "headlinesDetail": "Počet českých zpráv z posledního načtení",
+        "index": "PX Praha",
+        "fx": "Koruna FX"
+      },
+      "focusMap": "Zaměřit Česko",
+      "openBrief": "Otevřít profil země",
+      "latestHeadlines": "Nejnovější titulky",
+      "newsSectionTitle": "Český zpravodajský tok",
+      "watchSectionTitle": "Klíčové sledované body",
+      "focusPoint": "Zaměřit mapu",
+      "noNews": "Momentálně nejsou dostupné žádné české titulky",
+      "noMarketData": "Česká tržní data nejsou k dispozici",
+      "indexDetail": "Týdenní změna v {{currency}}",
+      "quoteDetails": {
+        "eur": "Euro vůči české koruně",
+        "usd": "Americký dolar vůči české koruně",
+        "cez": "Cena ČEZ na pražské burze",
+        "kb": "Komerční banka na pražské burze",
+        "moneta": "Moneta Money Bank na pražské burze"
+      },
+      "watchpoints": {
+        "prague": {
+          "title": "Praha",
+          "description": "Vláda, trhy, doprava a hlavní titulky",
+          "tag": "Hlavní město"
+        },
+        "brno": {
+          "title": "Brno",
+          "description": "Průmysl, soudy, univerzity a regionální tech aktivita",
+          "tag": "Region"
+        },
+        "temelin": {
+          "title": "Jaderná elektrárna Temelín",
+          "description": "Energetická bezpečnost, síťová rizika a infrastrukturní incidenty",
+          "tag": "Energie"
+        },
+        "dukovany": {
+          "title": "Jaderná elektrárna Dukovany",
+          "description": "Rozšíření, odstávky a spolehlivost výroby",
+          "tag": "Jádro"
+        },
+        "ostrava": {
+          "title": "Ostrava",
+          "description": "Těžký průmysl, logistika, ovzduší a pracovní signály",
+          "tag": "Průmysl"
+        },
+        "airport": {
+          "title": "Letiště Václava Havla",
+          "description": "Lety, cestovní narušení a problémy ve vzdušném prostoru",
+          "tag": "Letectví"
+        }
+      },
+      "live": {
+        "openBroadcastPanel": "Otevřít panel živého vysílání",
+        "openWebcamsPanel": "Otevřít české webkamery",
+        "broadcastSection": "Živé přenosy",
+        "cameraSection": "Živé kamery",
+        "watchLive": "Sledovat živě",
+        "openCamera": "Otevřít kameru",
+        "tags": {
+          "tv": "TV",
+          "radio": "Rádio",
+          "camera": "Kamera",
+          "transport": "Doprava",
+          "city": "Město"
+        },
+        "broadcasts": {
+          "ct24": "Veřejnoprávní živé vysílání ČT24",
+          "cnnPrima": "Český zpravodajský kanál s průběžným domácím pokrytím",
+          "radiozurnal": "Nepřetržité zpravodajské vysílání Českého rozhlasu"
+        },
+        "cameras": {
+          "airport": "Oficiální živá kamera Letiště Praha a planespotting pohled",
+          "mainStation": "Živá kamera Prahy hlavního nádraží",
+          "oldTown": "Webkamera historického centra Prahy",
+          "panorama": "Široký panoramatický pohled na Prahu"
+        }
+      }
     },
     "tradePolicy": {
       "restrictions": "Omezení",
@@ -987,6 +1086,7 @@
       "timeAll": "Vše",
       "views": {
         "global": "Globální",
+        "czechia": "Česko",
         "americas": "Amerika",
         "mena": "MENA",
         "europe": "Evropa",
@@ -1665,6 +1765,7 @@
       "regionAll": "Vše",
       "regionNorthAmerica": "Severní Amerika",
       "regionEurope": "Evropa",
+      "regionCzechia": "Česko",
       "regionLatinAmerica": "Latinská Amerika",
       "regionAsia": "Asie",
       "regionMiddleEast": "Blízký východ",

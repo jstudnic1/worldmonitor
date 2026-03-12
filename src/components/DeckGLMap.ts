@@ -113,7 +113,7 @@ import type { FeatureCollection, Geometry } from 'geojson';
 import { isAllowedPreviewUrl } from '@/utils/imagery-preview';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
-export type DeckMapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
+export type DeckMapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania' | 'czechia';
 type MapInteractionMode = 'flat' | '3d';
 
 export interface CountryClickPayload {
@@ -158,6 +158,7 @@ const VIEW_PRESETS: Record<DeckMapView, { longitude: number; latitude: number; z
   latam: { longitude: -60, latitude: -15, zoom: 3 },
   africa: { longitude: 20, latitude: 5, zoom: 3 },
   oceania: { longitude: 135, latitude: -25, zoom: 3.5 },
+  czechia: { longitude: 15.5, latitude: 49.85, zoom: 6.2 },
 };
 
 const MAP_INTERACTION_MODE: MapInteractionMode =
@@ -3747,6 +3748,7 @@ export class DeckGLMap {
       <div class="view-selector">
         <select class="view-select">
           <option value="global">${t('components.deckgl.views.global')}</option>
+          <option value="czechia">${t('components.deckgl.views.czechia')}</option>
           <option value="america">${t('components.deckgl.views.americas')}</option>
           <option value="mena">${t('components.deckgl.views.mena')}</option>
           <option value="eu">${t('components.deckgl.views.europe')}</option>

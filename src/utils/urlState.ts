@@ -40,7 +40,7 @@ const LAYER_KEYS: (keyof MapLayers)[] = [
 ];
 
 const TIME_RANGES: TimeRange[] = ['1h', '6h', '24h', '48h', '7d', 'all'];
-const VIEW_VALUES: MapView[] = ['global', 'america', 'mena', 'eu', 'asia', 'latam', 'africa', 'oceania'];
+const VIEW_VALUES: MapView[] = ['global', 'america', 'mena', 'eu', 'asia', 'latam', 'africa', 'oceania', 'czechia'];
 
 export interface ParsedMapUrlState {
   view?: MapView;
