@@ -47,7 +47,7 @@ Layers are organized into logical groups for efficient monitoring:
 **Military & Strategic**
 | Layer | Description |
 |-------|-------------|
-| **Military Bases** | 220+ global military installations from 9 operators |
+| **Military Bases** | 226 global military installations from 9 operators |
 | **Nuclear Facilities** | Power plants, weapons labs, enrichment sites |
 | **Gamma Irradiators** | IAEA-tracked Category 1-3 radiation sources |
 | **APT Groups** | State-sponsored cyber threat actors with geographic attribution |
@@ -57,15 +57,15 @@ Layers are organized into logical groups for efficient monitoring:
 **Infrastructure**
 | Layer | Description |
 |-------|-------------|
-| **Undersea Cables** | 55 major submarine cable routes worldwide |
+| **Undersea Cables** | 86 submarine cable routes worldwide |
 | **Pipelines** | 88 operating oil & gas pipelines across all continents |
 | **Internet Outages** | Network disruptions via Cloudflare Radar |
-| **AI Datacenters** | 111 major AI compute clusters (≥10,000 GPUs) |
+| **AI Datacenters** | 313 AI compute clusters tracked from Epoch AI dataset |
 
 **Transport**
 | Layer | Description |
 |-------|-------------|
-| **Ships (AIS)** | Live vessel tracking via AIS with chokepoint monitoring and 61 strategic ports* |
+| **Ships (AIS)** | Live vessel tracking via AIS with chokepoint monitoring and 62 strategic ports* |
 | **Delays** | FAA airport delay status and ground stops |
 
 *\*AIS data via [AISStream.io](https://aisstream.io) uses terrestrial receivers with stronger coverage in European/Atlantic waters. Middle East, Asia, and open ocean coverage is limited. Satellite AIS providers (Spire, Kpler) offer global coverage but require commercial licenses.*
@@ -92,7 +92,7 @@ Beyond raw data feeds, the dashboard provides synthesized intelligence panels:
 |-------|---------|
 | **AI Strategic Posture** | Theater-level military aggregation with strike capability analysis |
 | **Strategic Risk Overview** | Composite risk score combining all intelligence modules |
-| **Country Instability Index** | Real-time stability scores for 20 monitored countries |
+| **Country Instability Index** | Real-time stability scores for 24 monitored countries |
 | **Infrastructure Cascade** | Dependency analysis for cables, pipelines, and chokepoints |
 | **Live Intelligence** | GDELT-powered topic feeds (Military, Cyber, Nuclear, Sanctions) |
 | **Intel Feed** | Curated defense and security news sources |
@@ -435,10 +435,11 @@ The Flights layer tracks airport delays and ground stops at major US airports us
 
 ### Monitored Airports
 
-The 30 largest US airports are tracked:
+111 airports across 5 regions (Americas, Europe, Asia-Pacific, MENA, Africa) are monitored through three independent data sources (FAA ASWS, AviationStack, ICAO NOTAM):
 
-- Major hubs: JFK, LAX, ORD, ATL, DFW, DEN, SFO
+- Major US hubs: JFK, LAX, ORD, ATL, DFW, DEN, SFO
 - International gateways with high traffic volume
+- 46 MENA airports via ICAO NOTAM for closure detection
 - Airports frequently affected by weather or congestion
 
 Ground stops are particularly significant: they indicate severe disruption (weather, security, or infrastructure failure) and can cascade across the network.
