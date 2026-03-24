@@ -119,7 +119,7 @@ const FULL_MAP_LAYERS: MapLayers = {
   // Commodity layers (disabled in full variant)
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 const FULL_MOBILE_MAP_LAYERS: MapLayers = {
@@ -178,7 +178,7 @@ const FULL_MOBILE_MAP_LAYERS: MapLayers = {
   // Commodity layers (disabled in full variant)
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 // ============================================
@@ -279,7 +279,7 @@ const TECH_MAP_LAYERS: MapLayers = {
   // Commodity layers (disabled in tech variant)
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 const TECH_MOBILE_MAP_LAYERS: MapLayers = {
@@ -338,7 +338,7 @@ const TECH_MOBILE_MAP_LAYERS: MapLayers = {
   // Commodity layers (disabled in tech variant)
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 // ============================================
@@ -440,7 +440,7 @@ const FINANCE_MAP_LAYERS: MapLayers = {
   // Commodity layers (disabled in finance variant)
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
@@ -499,7 +499,7 @@ const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
   // Commodity layers (disabled in finance variant)
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 // ============================================
@@ -574,7 +574,7 @@ const HAPPY_MAP_LAYERS: MapLayers = {
   // Commodity layers (disabled)
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 const HAPPY_MOBILE_MAP_LAYERS: MapLayers = {
@@ -633,7 +633,7 @@ const HAPPY_MOBILE_MAP_LAYERS: MapLayers = {
   // Commodity layers (disabled)
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 // ============================================
@@ -722,7 +722,7 @@ const COMMODITY_MAP_LAYERS: MapLayers = {
   // Commodity layers (enabled)
   miningSites: true,
   processingPlants: true,
-  commodityPorts: true,
+  commodityPorts: true, realityProperties: false,
 };
 
 const COMMODITY_MOBILE_MAP_LAYERS: MapLayers = {
@@ -781,41 +781,85 @@ const COMMODITY_MOBILE_MAP_LAYERS: MapLayers = {
   // Commodity layers (limited on mobile)
   miningSites: true,
   processingPlants: false,
-  commodityPorts: true,
+  commodityPorts: true, realityProperties: false,
 };
+
+// ============================================
+// REALITY VARIANT (Czech Real Estate)
+// ============================================
+const REALITY_PANELS: Record<string, PanelConfig> = {
+  map: { name: 'Mapa nemovitostí', enabled: true, priority: 1 },
+  'ai-chat': { name: 'AI Asistent', enabled: true, priority: 1 },
+  'property-feed': { name: 'Nabídky nemovitostí', enabled: true, priority: 1 },
+  'market-stats': { name: 'Tržní statistiky', enabled: true, priority: 1 },
+  'reality-news': { name: 'Realitní zprávy', enabled: true, priority: 1 },
+  'market-analysis': { name: 'Analýza trhu', enabled: true, priority: 1 },
+  'alerts-panel': { name: 'Upozornění', enabled: true, priority: 1 },
+  'calendar-panel': { name: 'Kalendář', enabled: true, priority: 1 },
+  'legal-regulation': { name: 'Legislativa', enabled: true, priority: 2 },
+  'czech-economy': { name: 'Česká ekonomika', enabled: true, priority: 2 },
+  'missing-data': { name: 'Chybějící data', enabled: true, priority: 2 },
+  monitors: { name: 'Moje monitory', enabled: true, priority: 2 },
+};
+
+const REALITY_MAP_LAYERS: MapLayers = {
+  gpsJamming: false, satellites: false,
+  conflicts: false, bases: false, cables: false, pipelines: false,
+  hotspots: false, ais: false, nuclear: false, irradiators: false,
+  sanctions: false, weather: true, economic: true, waterways: false,
+  outages: false, cyberThreats: false, datacenters: false, protests: false,
+  flights: false, military: false, natural: false, spaceports: false,
+  minerals: false, fires: false, ucdpEvents: false, displacement: false,
+  climate: false, startupHubs: false, cloudRegions: false, accelerators: false,
+  techHQs: false, techEvents: false, stockExchanges: false,
+  financialCenters: false, centralBanks: false, commodityHubs: false,
+  gulfInvestments: false, positiveEvents: false, kindness: false,
+  happiness: false, speciesRecovery: false, renewableInstallations: false,
+  tradeRoutes: false, iranAttacks: false, ciiChoropleth: false,
+  dayNight: false, miningSites: false, processingPlants: false,
+  commodityPorts: false, realityProperties: true,
+};
+
+const REALITY_MOBILE_MAP_LAYERS: MapLayers = { ...REALITY_MAP_LAYERS };
 
 // ============================================
 // VARIANT-AWARE EXPORTS
 // ============================================
-export const DEFAULT_PANELS = SITE_VARIANT === 'happy' 
-  ? HAPPY_PANELS 
-  : SITE_VARIANT === 'tech' 
-    ? TECH_PANELS 
-    : SITE_VARIANT === 'finance' 
-      ? FINANCE_PANELS 
-      : SITE_VARIANT === 'commodity'
-        ? COMMODITY_PANELS
-        : FULL_PANELS;
+export const DEFAULT_PANELS = SITE_VARIANT === 'reality'
+  ? REALITY_PANELS
+  : SITE_VARIANT === 'happy'
+    ? HAPPY_PANELS
+    : SITE_VARIANT === 'tech'
+      ? TECH_PANELS
+      : SITE_VARIANT === 'finance'
+        ? FINANCE_PANELS
+        : SITE_VARIANT === 'commodity'
+          ? COMMODITY_PANELS
+          : FULL_PANELS;
 
-export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy' 
-  ? HAPPY_MAP_LAYERS 
-  : SITE_VARIANT === 'tech' 
-    ? TECH_MAP_LAYERS 
-    : SITE_VARIANT === 'finance' 
-      ? FINANCE_MAP_LAYERS 
-      : SITE_VARIANT === 'commodity'
-        ? COMMODITY_MAP_LAYERS
-        : FULL_MAP_LAYERS;
+export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'reality'
+  ? REALITY_MAP_LAYERS
+  : SITE_VARIANT === 'happy'
+    ? HAPPY_MAP_LAYERS
+    : SITE_VARIANT === 'tech'
+      ? TECH_MAP_LAYERS
+      : SITE_VARIANT === 'finance'
+        ? FINANCE_MAP_LAYERS
+        : SITE_VARIANT === 'commodity'
+          ? COMMODITY_MAP_LAYERS
+          : FULL_MAP_LAYERS;
 
-export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy' 
-  ? HAPPY_MOBILE_MAP_LAYERS 
-  : SITE_VARIANT === 'tech' 
-    ? TECH_MOBILE_MAP_LAYERS 
-    : SITE_VARIANT === 'finance' 
-      ? FINANCE_MOBILE_MAP_LAYERS 
-      : SITE_VARIANT === 'commodity'
-        ? COMMODITY_MOBILE_MAP_LAYERS
-        : FULL_MOBILE_MAP_LAYERS;
+export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'reality'
+  ? REALITY_MOBILE_MAP_LAYERS
+  : SITE_VARIANT === 'happy'
+    ? HAPPY_MOBILE_MAP_LAYERS
+    : SITE_VARIANT === 'tech'
+      ? TECH_MOBILE_MAP_LAYERS
+      : SITE_VARIANT === 'finance'
+        ? FINANCE_MOBILE_MAP_LAYERS
+        : SITE_VARIANT === 'commodity'
+          ? COMMODITY_MOBILE_MAP_LAYERS
+          : FULL_MOBILE_MAP_LAYERS;
 
 /** Maps map-layer toggle keys to their data-freshness source IDs (single source of truth). */
 export const LAYER_TO_SOURCE: Partial<Record<keyof MapLayers, DataSourceId[]>> = {

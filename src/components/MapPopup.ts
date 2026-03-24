@@ -14,7 +14,7 @@ import { getNaturalEventIcon } from '@/services/eonet';
 import { getHotspotEscalation, getEscalationChange24h } from '@/services/hotspot-escalation';
 import { getCableHealthRecord } from '@/services/cable-health';
 
-export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'cyberThreat' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'datacenterCluster' | 'ais' | 'protest' | 'protestCluster' | 'flight' | 'aircraft' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral' | 'startupHub' | 'cloudRegion' | 'techHQ' | 'accelerator' | 'techEvent' | 'techHQCluster' | 'techEventCluster' | 'techActivity' | 'geoActivity' | 'stockExchange' | 'financialCenter' | 'centralBank' | 'commodityHub' | 'iranEvent' | 'gpsJamming';
+export type PopupType = 'conflict' | 'hotspot' | 'earthquake' | 'weather' | 'base' | 'waterway' | 'apt' | 'cyberThreat' | 'nuclear' | 'economic' | 'irradiator' | 'pipeline' | 'cable' | 'cable-advisory' | 'repair-ship' | 'outage' | 'datacenter' | 'datacenterCluster' | 'ais' | 'protest' | 'protestCluster' | 'flight' | 'aircraft' | 'militaryFlight' | 'militaryVessel' | 'militaryFlightCluster' | 'militaryVesselCluster' | 'natEvent' | 'port' | 'spaceport' | 'mineral' | 'startupHub' | 'cloudRegion' | 'techHQ' | 'accelerator' | 'techEvent' | 'techHQCluster' | 'techEventCluster' | 'techActivity' | 'geoActivity' | 'stockExchange' | 'financialCenter' | 'centralBank' | 'commodityHub' | 'iranEvent' | 'gpsJamming' | 'realityProperty';
 
 interface TechEventPopupData {
   id: string;
@@ -141,9 +141,17 @@ interface DatacenterClusterData {
   sampled?: boolean;
 }
 
+export interface RealityPropertyPopupData {
+  title: string;
+  type: string;
+  price: number;
+  city: string;
+  area_m2: number;
+}
+
 interface PopupData {
   type: PopupType;
-  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | CyberThreat | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | PositionSample | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | CloudRegion | TechHQ | Accelerator | TechEventPopupData | TechHQClusterData | TechEventClusterData | ProtestClusterData | DatacenterClusterData | TechHubActivity | GeoHubActivity | StockExchangePopupData | FinancialCenterPopupData | CentralBankPopupData | CommodityHubPopupData | IranEventPopupData | GpsJammingPopupData;
+  data: ConflictZone | Hotspot | Earthquake | WeatherAlert | MilitaryBase | StrategicWaterway | APTGroup | CyberThreat | NuclearFacility | EconomicCenter | GammaIrradiator | Pipeline | UnderseaCable | CableAdvisory | RepairShip | InternetOutage | AIDataCenter | AisDisruptionEvent | SocialUnrestEvent | AirportDelayAlert | PositionSample | MilitaryFlight | MilitaryVessel | MilitaryFlightCluster | MilitaryVesselCluster | NaturalEvent | Port | Spaceport | CriticalMineralProject | StartupHub | CloudRegion | TechHQ | Accelerator | TechEventPopupData | TechHQClusterData | TechEventClusterData | ProtestClusterData | DatacenterClusterData | TechHubActivity | GeoHubActivity | StockExchangePopupData | FinancialCenterPopupData | CentralBankPopupData | CommodityHubPopupData | IranEventPopupData | GpsJammingPopupData | RealityPropertyPopupData;
   relatedNews?: NewsItem[];
   x: number;
   y: number;
@@ -472,9 +480,31 @@ export class MapPopup {
         return this.renderIranEventPopup(data.data as IranEventPopupData);
       case 'gpsJamming':
         return this.renderGpsJammingPopup(data.data as GpsJammingPopupData);
+      case 'realityProperty':
+        return this.renderRealityPropertyPopup(data.data as RealityPropertyPopupData);
       default:
         return '';
     }
+  }
+
+  private renderRealityPropertyPopup(p: RealityPropertyPopupData): string {
+    const priceStr = p.price >= 1_000_000
+      ? `${(p.price / 1_000_000).toFixed(1)} mil. Kč`
+      : `${p.price.toLocaleString('cs-CZ')} Kč`;
+    const typeLabels: Record<string, string> = { byt: 'Byt', 'dům': 'Dům', pozemek: 'Pozemek', 'komerční': 'Komerční' };
+    return `
+      <div class="popup-header">
+        <span class="popup-icon">🏠</span>
+        <strong>${escapeHtml(p.title)}</strong>
+      </div>
+      <div class="popup-body">
+        <div class="popup-row"><span class="popup-label">Typ:</span> ${escapeHtml(typeLabels[p.type] ?? p.type)}</div>
+        <div class="popup-row"><span class="popup-label">Město:</span> ${escapeHtml(p.city)}</div>
+        <div class="popup-row"><span class="popup-label">Plocha:</span> ${p.area_m2} m²</div>
+        <div class="popup-row"><span class="popup-label">Cena:</span> <strong>${priceStr}</strong></div>
+        ${p.area_m2 > 0 && p.price > 0 ? `<div class="popup-row"><span class="popup-label">Cena/m²:</span> ${Math.round(p.price / p.area_m2).toLocaleString('cs-CZ')} Kč</div>` : ''}
+      </div>
+    `;
   }
 
 

@@ -75,7 +75,7 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   // Commodity variant layers (disabled in happy variant)
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 // Mobile defaults — same as desktop for happy variant
@@ -135,7 +135,7 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   // Commodity variant layers (disabled in happy variant)
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 export const VARIANT_CONFIG: VariantConfig = {

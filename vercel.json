@@ -1,6 +1,10 @@
 {
   "ignoreCommand": "bash scripts/vercel-ignore.sh",
-  "crons": [],
+  "buildCommand": "VITE_VARIANT=reality npm run build",
+  "crons": [
+    { "path": "/api/cron/sync-sreality", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/run-monitor-digests", "schedule": "0 8 * * *" }
+  ],
   "rewrites": [
     { "source": "/docs", "destination": "https://worldmonitor.mintlify.dev/docs" },
     { "source": "/docs/:match*", "destination": "https://worldmonitor.mintlify.dev/docs/:match*" },

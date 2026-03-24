@@ -186,7 +186,7 @@ const allLayersEnabled: MapLayers = {
   dayNight: true,
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 const allLayersDisabled: MapLayers = {
@@ -240,7 +240,7 @@ const allLayersDisabled: MapLayers = {
   dayNight: false,
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 const SEEDED_NEWS_LOCATIONS: Array<{

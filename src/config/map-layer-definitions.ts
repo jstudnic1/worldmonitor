@@ -2,7 +2,7 @@ import type { MapLayers } from '@/types';
 import { isDesktopRuntime } from '@/services/runtime';
 
 export type MapRenderer = 'flat' | 'globe';
-export type MapVariant = 'full' | 'tech' | 'finance' | 'happy' | 'commodity';
+export type MapVariant = 'full' | 'tech' | 'finance' | 'happy' | 'commodity' | 'reality';
 
 const _desktop = isDesktopRuntime();
 
@@ -76,6 +76,7 @@ export const LAYER_REGISTRY: Record<keyof MapLayers, LayerDefinition> = {
   miningSites:              def('miningSites',              '&#128301;', 'miningSites',              'Mining Sites'),
   processingPlants:         def('processingPlants',         '&#127981;', 'processingPlants',         'Processing Plants'),
   commodityPorts:           def('commodityPorts',           '&#9973;',   'commodityPorts',           'Commodity Ports'),
+  realityProperties:        def('realityProperties',        '&#127968;', 'realityProperties',        'Nemovitosti'),
 };
 
 const VARIANT_LAYER_ORDER: Record<MapVariant, Array<keyof MapLayers>> = {
@@ -109,6 +110,9 @@ const VARIANT_LAYER_ORDER: Record<MapVariant, Array<keyof MapLayers>> = {
     'minerals', 'pipelines', 'waterways', 'tradeRoutes',
     'ais', 'economic', 'fires', 'climate',
     'natural', 'weather', 'outages', 'dayNight',
+  ],
+  reality: [
+    'realityProperties', 'weather', 'economic',
   ],
 };
 

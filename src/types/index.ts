@@ -564,6 +564,8 @@ export interface MapLayers {
   miningSites: boolean;
   processingPlants: boolean;
   commodityPorts: boolean;
+  // Reality variant layers
+  realityProperties: boolean;
 }
 
 export interface AIDataCenter {

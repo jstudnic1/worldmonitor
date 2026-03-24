@@ -831,6 +831,13 @@ export default defineConfig({
       ],
     },
     proxy: {
+      // Reality variant API routes (Vercel Edge Functions proxied to deployed instance)
+      '/api/properties': { target: 'https://worldmonitor-eta-sand.vercel.app', changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
+      '/api/market-stats': { target: 'https://worldmonitor-eta-sand.vercel.app', changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
+      '/api/alerts': { target: 'https://worldmonitor-eta-sand.vercel.app', changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
+      '/api/calendar': { target: 'https://worldmonitor-eta-sand.vercel.app', changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
+      '/api/missing-data': { target: 'https://worldmonitor-eta-sand.vercel.app', changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
+      '/api/chat': { target: 'https://worldmonitor-eta-sand.vercel.app', changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
       // Yahoo Finance API
       '/api/yahoo': {
         target: 'https://query1.finance.yahoo.com',

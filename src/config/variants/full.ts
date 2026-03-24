@@ -106,7 +106,7 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   // Commodity variant layers (disabled in full variant)
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 // Mobile-specific defaults for geopolitical
@@ -165,7 +165,7 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   // Commodity variant layers (disabled in full variant)
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 export const VARIANT_CONFIG: VariantConfig = {

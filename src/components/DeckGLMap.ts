@@ -336,6 +336,10 @@ export class DeckGLMap {
   private imagerySearchTimer: ReturnType<typeof setTimeout> | null = null;
   private imagerySearchVersion = 0;
 
+  // Reality variant property markers
+  private realityProperties: Array<{ id: string; lat: number; lon: number; title: string; type: string; price: number; city: string; area_m2: number }> = [];
+  private realityPropertiesLoaded = false;
+
   // Phase 8 overlay data
   private happinessScores: Map<string, number> = new Map();
   private happinessYear = 0;
@@ -1506,6 +1510,14 @@ export class DeckGLMap {
     // News geo-locations (always shown if data exists)
     if (this.newsLocations.length > 0) {
       layers.push(...this.createNewsLocationsLayer());
+    }
+
+    // Reality variant: property markers from Supabase
+    if (mapLayers.realityProperties) {
+      if (!this.realityPropertiesLoaded) void this.fetchRealityProperties();
+      if (this.realityProperties.length > 0) {
+        layers.push(this.createRealityPropertiesLayer());
+      }
     }
 
     const result = layers.filter(Boolean) as LayersList;
@@ -4741,6 +4753,46 @@ export class DeckGLMap {
   public setRenewableInstallations(installations: RenewableInstallation[]): void {
     this.renewableInstallations = installations;
     this.render();
+  }
+
+  /** Fetch and display property markers for reality variant */
+  private async fetchRealityProperties(): Promise<void> {
+    if (this.realityPropertiesLoaded) return;
+    this.realityPropertiesLoaded = true;
+    try {
+      const res = await fetch('/api/properties?limit=1500&status=aktivn%C3%AD');
+      if (!res.ok) return;
+      const data = await res.json() as { properties: Array<{ id: string; lat: number; lon: number; title: string; type: string; price: number; city: string; area_m2: number }> };
+      this.realityProperties = (data.properties || []).filter(p => p.lat && p.lon);
+      this.render();
+    } catch { /* silent */ }
+  }
+
+  private createRealityPropertiesLayer(): ScatterplotLayer {
+    const TYPE_COLORS: Record<string, [number, number, number, number]> = {
+      'byt': [68, 255, 136, 200],       // green
+      'dům': [68, 136, 255, 200],        // blue
+      'pozemek': [255, 170, 68, 200],    // orange
+      'komerční': [255, 68, 136, 200],   // pink
+    };
+    return new ScatterplotLayer({
+      id: 'reality-properties-layer',
+      data: this.realityProperties,
+      getPosition: (d: { lon: number; lat: number }) => [d.lon, d.lat],
+      getRadius: 200,
+      radiusMinPixels: 3,
+      radiusMaxPixels: 12,
+      getFillColor: (d: { type: string }) => TYPE_COLORS[d.type] ?? [180, 180, 180, 180],
+      pickable: true,
+      autoHighlight: true,
+      highlightColor: [255, 255, 255, 120],
+      onClick: (info: PickingInfo) => {
+        if (!info.object) return;
+        const p = info.object as { title: string; type: string; price: number; city: string; area_m2: number };
+        this.popup.show({ type: 'realityProperty', data: p, x: info.x, y: info.y });
+      },
+      updateTriggers: { getPosition: this.realityProperties.length, getFillColor: this.realityProperties.length },
+    });
   }
 
   public updateHotspotActivity(news: NewsItem[]): void {

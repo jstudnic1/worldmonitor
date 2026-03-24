@@ -53,7 +53,7 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   minerals: true,           // Critical minerals projects (existing layer)
   miningSites: true,        // ~70 major mine sites from commodity-geo.ts
   processingPlants: true,   // Smelters, refineries, separation plants
-  commodityPorts: true,     // Mineral export/import ports
+  commodityPorts: true, realityProperties: false,     // Mineral export/import ports
   commodityHubs: true,      // Commodity exchanges (LME, CME, SHFE, etc.)
   pipelines: true,          // Oil & gas pipelines (energy commodity context)
   waterways: true,          // Strategic shipping chokepoints
@@ -124,7 +124,7 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   minerals: true,
   miningSites: true,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
   commodityHubs: true,
   pipelines: false,
   waterways: false,

@@ -135,7 +135,7 @@ const layers = {
   dayNight: false,
   miningSites: false,
   processingPlants: false,
-  commodityPorts: false,
+  commodityPorts: false, realityProperties: false,
 };
 
 await initI18n();

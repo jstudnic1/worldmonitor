@@ -37,6 +37,12 @@ import {
   WorldClockPanel,
   AirlineIntelPanel,
   AviationCommandBar,
+  AIChatPanel,
+  PropertyFeedPanel,
+  MarketStatsPanel,
+  AlertsPanel,
+  CalendarPanel,
+  MissingDataPanel,
 } from '@/components';
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { focusInvestmentOnMap } from '@/services/investments-focus';
@@ -486,10 +492,13 @@ export class PanelLayoutManager implements AppModule {
 
     const mapContainer = document.getElementById('mapContainer') as HTMLElement;
     const preferGlobe = loadFromStorage<string>(STORAGE_KEYS.mapMode, 'flat') === 'globe';
+    const defaultView = SITE_VARIANT === 'reality' ? 'czechia' as const
+      : this.ctx.isMobile ? this.ctx.resolvedLocation : 'global' as const;
+    const defaultZoom = SITE_VARIANT === 'reality' ? 6.2 : this.ctx.isMobile ? 2.5 : 1.0;
     this.ctx.map = new MapContainer(mapContainer, {
-      zoom: this.ctx.isMobile ? 2.5 : 1.0,
+      zoom: defaultZoom,
       pan: { x: 0, y: 0 },
-      view: this.ctx.isMobile ? this.ctx.resolvedLocation : 'global',
+      view: defaultView,
       layers: this.ctx.mapLayers,
       timeRange: '7d',
     }, preferGlobe);
@@ -753,6 +762,22 @@ export class PanelLayoutManager implements AppModule {
     this.lazyPanel('giving', () =>
       import('@/components/GivingPanel').then(m => new m.GivingPanel()),
     );
+
+    // Reality variant panels (Czech Real Estate)
+    if (SITE_VARIANT === 'reality') {
+      this.createPanel('ai-chat', () => new AIChatPanel());
+      this.createPanel('property-feed', () => new PropertyFeedPanel());
+      this.createPanel('market-stats', () => new MarketStatsPanel());
+      this.createPanel('alerts-panel', () => new AlertsPanel());
+      this.createPanel('calendar-panel', () => new CalendarPanel());
+      this.createPanel('missing-data', () => new MissingDataPanel());
+
+      // Reality news feeds
+      this.createNewsPanel('reality-news', 'Realitní zprávy');
+      this.createNewsPanel('market-analysis', 'Analýza trhu');
+      this.createNewsPanel('legal-regulation', 'Legislativa');
+      this.createNewsPanel('czech-economy', 'Česká ekonomika');
+    }
 
     // Happy variant panels (lazy-loaded — only relevant for happy variant)
     if (SITE_VARIANT === 'happy') {

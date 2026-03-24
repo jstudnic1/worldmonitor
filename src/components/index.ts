@@ -53,3 +53,11 @@ export * from './GulfEconomiesPanel';
 export * from './WorldClockPanel';
 export { AirlineIntelPanel } from './AirlineIntelPanel';
 export { AviationCommandBar } from './AviationCommandBar';
+
+// Reality variant panels
+export { AIChatPanel } from './AIChatPanel';
+export { PropertyFeedPanel } from './PropertyFeedPanel';
+export { MarketStatsPanel } from './MarketStatsPanel';
+export { AlertsPanel } from './AlertsPanel';
+export { CalendarPanel } from './CalendarPanel';
+export { MissingDataPanel } from './MissingDataPanel';
