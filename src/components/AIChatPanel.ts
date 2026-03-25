@@ -1,5 +1,27 @@
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
+import { Chart, registerables } from 'chart.js';
+
+Chart.register(...registerables);
+
+const CHART_COLORS = [
+  'rgba(68, 255, 136, 0.85)',
+  'rgba(68, 136, 255, 0.85)',
+  'rgba(255, 136, 68, 0.85)',
+  'rgba(255, 68, 170, 0.85)',
+  'rgba(170, 68, 255, 0.85)',
+  'rgba(68, 220, 255, 0.85)',
+];
+const CHART_BG = [
+  'rgba(68, 255, 136, 0.18)',
+  'rgba(68, 136, 255, 0.18)',
+  'rgba(255, 136, 68, 0.18)',
+  'rgba(255, 68, 170, 0.18)',
+  'rgba(170, 68, 255, 0.18)',
+  'rgba(68, 220, 255, 0.18)',
+];
+
+let chartIdSeq = 0;
 
 type AgentMetric = {
   label: string;
@@ -108,6 +130,8 @@ type StructuredResult = {
   artifactRefs?: ArtifactRef[];
 };
 
+type AgentMode = 'auto' | 'openrouter' | 'openclaw';
+
 type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
@@ -116,6 +140,7 @@ type ChatMessage = {
 };
 
 const CHAT_HISTORY_KEY = 'reality-chat-history';
+const CHAT_AGENT_MODE_KEY = 'reality-chat-agent-mode';
 const MAX_HISTORY = 50;
 
 export class AIChatPanel extends Panel {
@@ -123,6 +148,9 @@ export class AIChatPanel extends Panel {
   private inputEl: HTMLTextAreaElement | null = null;
   private messagesEl: HTMLElement | null = null;
   private isStreaming = false;
+  private agentMode: AgentMode = 'auto';
+  private pendingCharts: Map<string, ChartArtifact> = new Map();
+  private activeCharts: Chart[] = [];
 
   constructor() {
     super({
@@ -130,8 +158,23 @@ export class AIChatPanel extends Panel {
       title: 'AI Asistent',
       className: 'panel-wide ai-chat-panel',
     });
+    this.agentMode = this.loadAgentMode();
     this.loadHistory();
     this.render();
+  }
+
+  private loadAgentMode(): AgentMode {
+    try {
+      const stored = localStorage.getItem(CHAT_AGENT_MODE_KEY);
+      if (stored === 'openrouter' || stored === 'openclaw') return stored;
+    } catch {
+      // Ignore storage failures.
+    }
+    return 'auto';
+  }
+
+  private saveAgentMode(): void {
+    localStorage.setItem(CHAT_AGENT_MODE_KEY, this.agentMode);
   }
 
   private loadHistory(): void {
@@ -162,6 +205,28 @@ export class AIChatPanel extends Panel {
 
     const inputRow = document.createElement('div');
     inputRow.className = 'ai-chat-input-row';
+
+    const modeRow = document.createElement('div');
+    modeRow.className = 'ai-chat-mode-row';
+    const modes: Array<{ id: AgentMode; label: string }> = [
+      { id: 'auto', label: 'Auto' },
+      { id: 'openrouter', label: 'OpenRouter' },
+      { id: 'openclaw', label: 'OpenClaw' },
+    ];
+
+    for (const mode of modes) {
+      const button = document.createElement('button');
+      button.className = `ai-chat-mode-btn${this.agentMode === mode.id ? ' is-active' : ''}`;
+      button.textContent = mode.label;
+      button.addEventListener('click', () => {
+        this.agentMode = mode.id;
+        this.saveAgentMode();
+        this.render();
+      });
+      modeRow.appendChild(button);
+    }
+
+    container.appendChild(modeRow);
 
     this.inputEl = document.createElement('textarea');
     this.inputEl.className = 'ai-chat-input';
@@ -278,6 +343,7 @@ export class AIChatPanel extends Panel {
 
     this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     this.attachActionHandlers();
+    this.initPendingCharts();
   }
 
   private attachActionHandlers(): void {
@@ -448,36 +514,89 @@ export class AIChatPanel extends Panel {
   }
 
   private renderChartArtifact(artifact: ChartArtifact): string {
-    const allValues = artifact.series.flatMap((series) => series.values.map((value) => Number(value) || 0));
-    const maxValue = Math.max(1, ...allValues);
+    const canvasId = `ai-chart-${++chartIdSeq}`;
+    this.pendingCharts.set(canvasId, artifact);
 
     return `<div class="ai-artifact-card">
       ${artifact.title ? `<div class="ai-artifact-title">${escapeHtml(artifact.title)}</div>` : ''}
-      <div class="ai-chart">
-        ${artifact.labels.map((label, labelIndex) => `
-          <div class="ai-chart-row">
-            <div class="ai-chart-row-label">${escapeHtml(label)}</div>
-            <div class="ai-chart-row-bars">
-              ${artifact.series.map((series, seriesIndex) => {
-                const value = Number(series.values[labelIndex] || 0);
-                const width = `${Math.max(4, (value / maxValue) * 100)}%`;
-                return `
-                  <div class="ai-chart-series">
-                    <div class="ai-chart-series-meta">
-                      <span class="ai-chart-series-name">${escapeHtml(series.name)}</span>
-                      <span class="ai-chart-series-value">${escapeHtml(`${value}${artifact.unit ? ` ${artifact.unit}` : ''}`)}</span>
-                    </div>
-                    <div class="ai-chart-track">
-                      <div class="ai-chart-fill ai-chart-fill-${seriesIndex % 4}" style="width:${width}"></div>
-                    </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          </div>
-        `).join('')}
+      <div class="ai-chart-canvas-wrap">
+        <canvas id="${canvasId}" height="260"></canvas>
       </div>
     </div>`;
+  }
+
+  private initPendingCharts(): void {
+    // Destroy old charts to prevent memory leaks
+    for (const chart of this.activeCharts) {
+      chart.destroy();
+    }
+    this.activeCharts = [];
+
+    for (const [canvasId, artifact] of this.pendingCharts) {
+      const canvas = document.getElementById(canvasId) as HTMLCanvasElement | null;
+      if (!canvas) continue;
+
+      const isLine = artifact.chartType === 'line';
+      const datasets = artifact.series.map((s, i) => ({
+        label: s.name,
+        data: s.values.map((v) => Number(v) || 0),
+        backgroundColor: isLine ? CHART_BG[i % CHART_BG.length] : CHART_COLORS[i % CHART_COLORS.length],
+        borderColor: CHART_COLORS[i % CHART_COLORS.length],
+        borderWidth: isLine ? 2.5 : 1,
+        borderRadius: isLine ? 0 : 4,
+        fill: isLine,
+        tension: 0.35,
+        pointRadius: isLine ? 4 : 0,
+        pointBackgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+      }));
+
+      const chart = new Chart(canvas, {
+        type: isLine ? 'line' : 'bar',
+        data: { labels: artifact.labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 600, easing: 'easeOutQuart' },
+          plugins: {
+            legend: {
+              display: artifact.series.length > 1,
+              position: 'top',
+              labels: { color: 'rgba(255,255,255,0.7)', font: { size: 11 }, boxWidth: 12, padding: 12 },
+            },
+            tooltip: {
+              backgroundColor: 'rgba(20,20,30,0.95)',
+              titleColor: '#fff',
+              bodyColor: 'rgba(255,255,255,0.85)',
+              borderColor: 'rgba(255,255,255,0.1)',
+              borderWidth: 1,
+              padding: 10,
+              callbacks: {
+                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}${artifact.unit ? ` ${artifact.unit}` : ''}`,
+              },
+            },
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255,255,255,0.06)' },
+              ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10 } },
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(255,255,255,0.06)' },
+              ticks: {
+                color: 'rgba(255,255,255,0.5)',
+                font: { size: 10 },
+                callback: (val) => `${val}${artifact.unit ? ` ${artifact.unit}` : ''}`,
+              },
+            },
+          },
+        },
+      });
+
+      this.activeCharts.push(chart);
+    }
+
+    this.pendingCharts.clear();
   }
 
   private renderEmailArtifact(artifact: EmailArtifact): string {
@@ -572,6 +691,8 @@ export class AIChatPanel extends Panel {
     if (source === 'supabase') return 'Živá data';
     if (source === 'hybrid') return 'Hybridní data';
     if (source === 'demo') return 'Demo data';
+    if (source === 'openclaw') return 'OpenClaw';
+    if (source === 'openclaw-preview') return 'OpenClaw preview';
     return source;
   }
 
@@ -606,6 +727,7 @@ export class AIChatPanel extends Panel {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          agentMode: this.agentMode,
           messages: this.messages.slice(0, -1).map((message) => ({
             role: message.role,
             content: message.content,
@@ -645,6 +767,8 @@ export class AIChatPanel extends Panel {
   }
 
   destroy(): void {
+    for (const chart of this.activeCharts) chart.destroy();
+    this.activeCharts = [];
     super.destroy();
   }
 }
