@@ -791,6 +791,7 @@ export class EventHandlerManager implements AppModule {
   }
 
   startHeaderClock(): void {
+    if (SITE_VARIANT === 'reality') return;
     const el = document.getElementById('headerClock');
     if (!el) return;
     const tick = () => {
@@ -805,7 +806,7 @@ export class EventHandlerManager implements AppModule {
   }
 
   setupPizzIntIndicator(): void {
-    if (SITE_VARIANT === 'tech' || SITE_VARIANT === 'finance' || SITE_VARIANT === 'happy') return;
+    if (SITE_VARIANT === 'tech' || SITE_VARIANT === 'finance' || SITE_VARIANT === 'happy' || SITE_VARIANT === 'reality') return;
 
     this.ctx.pizzintIndicator = new PizzIntIndicator();
     const headerLeft = this.ctx.container.querySelector('.header-left');
@@ -815,6 +816,7 @@ export class EventHandlerManager implements AppModule {
   }
 
   setupExportPanel(): void {
+    if (SITE_VARIANT === 'reality') return;
     this.ctx.exportPanel = new ExportPanel(() => ({
       news: this.ctx.latestClusters.length > 0 ? this.ctx.latestClusters : this.ctx.allNews,
       markets: this.ctx.latestMarkets,
@@ -892,6 +894,7 @@ export class EventHandlerManager implements AppModule {
   }
 
   setupPlaybackControl(): void {
+    if (SITE_VARIANT === 'reality') return;
     this.ctx.playbackControl = new PlaybackControl();
     this.ctx.playbackControl.onSnapshot((snapshot) => {
       if (snapshot) {

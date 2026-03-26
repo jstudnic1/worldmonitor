@@ -1,4 +1,14 @@
 import { Panel } from './Panel';
+import { SITE_VARIANT } from '@/config';
+import {
+  getFocusedRealityProperty,
+  setFocusedRealityProperty,
+  subscribeRealityPropertyFocusChange,
+} from '@/services/reality-property-focus';
+import {
+  getRealityPropertySource,
+  subscribeRealityPropertySourceChange,
+} from '@/services/reality-source-settings';
 import { escapeHtml } from '@/utils/sanitize';
 
 type Property = {
@@ -13,17 +23,28 @@ type Property = {
   district: string;
   status: string;
   listed_at: string;
+  lat?: number;
+  lon?: number;
+  source?: string;
   image_url?: string;
 };
 
 type TabId = 'sale' | 'rent' | 'new';
+type PropertiesResponse = {
+  properties: Property[];
+  source?: string;
+};
 
 const REFRESH_MS = 60 * 1000;
 
 export class PropertyFeedPanel extends Panel {
   private activeTab: TabId = 'sale';
   private properties: Property[] = [];
+  private selectedPropertyId: string | null = getFocusedRealityProperty()?.id ?? null;
+  private loadError: string | null = null;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
+  private unsubscribeSourceChange: (() => void) | null = null;
+  private unsubscribePropertyFocusChange: (() => void) | null = null;
 
   constructor() {
     super({
@@ -32,19 +53,70 @@ export class PropertyFeedPanel extends Panel {
       showCount: true,
       className: 'panel-wide',
     });
+    this.content.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      const tab = target.closest<HTMLElement>('.panel-tab');
+      if (tab?.dataset.tab) {
+        this.activeTab = tab.dataset.tab as TabId;
+        void this.loadData();
+        return;
+      }
+
+      const row = target.closest<HTMLElement>('.property-row');
+      if (row?.dataset.id) {
+        this.selectProperty(row.dataset.id);
+      }
+    });
+    this.content.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const target = event.target as HTMLElement;
+      const row = target.closest<HTMLElement>('.property-row');
+      if (!row?.dataset.id) return;
+      event.preventDefault();
+      this.selectProperty(row.dataset.id);
+    });
     void this.loadData();
     this.refreshTimer = setInterval(() => void this.loadData(), REFRESH_MS);
+    this.unsubscribeSourceChange = subscribeRealityPropertySourceChange(() => {
+      void this.loadData();
+    });
+    this.unsubscribePropertyFocusChange = subscribeRealityPropertyFocusChange((focus) => {
+      this.selectedPropertyId = focus?.id ?? null;
+      this.applySelectedState();
+    });
   }
 
   private async loadData(): Promise<void> {
     try {
-      const res = await fetch(`/api/properties?type=${this.activeTab}`);
+      const params = new URLSearchParams({ type: this.activeTab });
+      const source = getRealityPropertySource();
+      if (source !== 'all') params.set('source', source);
+
+      const res = await fetch(`/api/properties?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as { properties: Property[] };
-      this.properties = data.properties;
+      const data = await res.json() as PropertiesResponse;
+      if (SITE_VARIANT === 'reality' && data.source !== 'supabase') {
+        this.properties = [];
+        this.loadError = 'Živá data nemovitostí nejsou aktuálně dostupná.';
+        this.setCount(0);
+        this.renderContent();
+        return;
+      }
+
+      this.properties = SITE_VARIANT === 'reality'
+        ? data.properties.filter((property) => Number.isFinite(property.lat) && Number.isFinite(property.lon))
+        : data.properties;
+      this.loadError = null;
       this.setCount(this.properties.length);
       this.renderContent();
     } catch {
+      if (SITE_VARIANT === 'reality') {
+        this.properties = [];
+        this.loadError = 'Nepodařilo se načíst živé nabídky z databáze.';
+        this.setCount(0);
+        this.renderContent();
+        return;
+      }
       this.renderFallbackData();
     }
   }
@@ -87,8 +159,9 @@ export class PropertyFeedPanel extends Panel {
         const typeLabel = p.type || '';
         const area = p.area_m2 ? `${p.area_m2} m²` : '';
         const rooms = p.rooms && p.rooms !== '-' ? p.rooms : '';
+        const isSelected = this.selectedPropertyId === p.id;
         return `
-          <div class="property-row" data-id="${escapeHtml(p.id)}">
+          <div class="property-row ${isSelected ? 'is-selected' : ''}" data-id="${escapeHtml(p.id)}" role="button" tabindex="0">
             <div class="property-row-main">
               <div class="property-title">${escapeHtml(p.title)}</div>
               <div class="property-meta">
@@ -106,20 +179,12 @@ export class PropertyFeedPanel extends Panel {
           </div>
         `;
       }).join('')
-      : '<div class="property-empty">Žádné nabídky v této kategorii</div>';
+      : `<div class="property-empty">${escapeHtml(this.loadError || 'Žádné nabídky v této kategorii')}</div>`;
 
     this.setContent(`
       ${tabs}
       <div class="property-feed-list">${rows}</div>
     `);
-
-    // Attach tab handlers
-    this.content.querySelectorAll('.panel-tab').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        this.activeTab = (btn as HTMLElement).dataset.tab as TabId;
-        void this.loadData();
-      });
-    });
   }
 
   private formatPrice(price: number): string {
@@ -129,8 +194,31 @@ export class PropertyFeedPanel extends Panel {
     return price.toLocaleString('cs-CZ') + ' Kč';
   }
 
+  private applySelectedState(): void {
+    this.content.querySelectorAll<HTMLElement>('.property-row').forEach((row) => {
+      row.classList.toggle('is-selected', row.dataset.id === this.selectedPropertyId);
+    });
+  }
+
+  private selectProperty(propertyId: string): void {
+    const property = this.properties.find((entry) => entry.id === propertyId);
+    if (!property) return;
+    this.selectedPropertyId = property.id;
+    this.applySelectedState();
+    setFocusedRealityProperty({
+      id: property.id,
+      title: property.title,
+      lat: property.lat,
+      lon: property.lon,
+    });
+  }
+
   destroy(): void {
     if (this.refreshTimer) clearInterval(this.refreshTimer);
+    this.unsubscribeSourceChange?.();
+    this.unsubscribeSourceChange = null;
+    this.unsubscribePropertyFocusChange?.();
+    this.unsubscribePropertyFocusChange = null;
     super.destroy();
   }
 }

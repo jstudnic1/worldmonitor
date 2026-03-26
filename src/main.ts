@@ -397,7 +397,31 @@ if ('__TAURI_INTERNALS__' in window || '__TAURI__' in window) {
   });
 }
 
-if (!('__TAURI_INTERNALS__' in window) && !('__TAURI__' in window) && 'serviceWorker' in navigator) {
+const shouldUseServiceWorker = !('__TAURI_INTERNALS__' in window)
+  && !('__TAURI__' in window)
+  && 'serviceWorker' in navigator
+  && SITE_VARIANT !== 'reality';
+
+if (!shouldUseServiceWorker && SITE_VARIANT === 'reality' && 'serviceWorker' in navigator) {
+  const nukeKey = 'wm-reality-sw-disabled-v1';
+  let alreadyNuked = false;
+  try { alreadyNuked = !!localStorage.getItem(nukeKey); } catch {}
+
+  if (!alreadyNuked) {
+    try { localStorage.setItem(nukeKey, '1'); } catch {}
+    navigator.serviceWorker.getRegistrations().then(async (registrations) => {
+      await Promise.all(registrations.map((registration) => registration.unregister().catch(() => false)));
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key).catch(() => false)));
+      }
+      console.log('[PWA] Reality variant disabled service workers and cleared caches');
+      window.location.reload();
+    }).catch(() => {});
+  }
+}
+
+if (shouldUseServiceWorker) {
   // Auto-reload when a new SW takes control (fixes stale HTML after deploys)
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {

@@ -992,6 +992,23 @@ export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: s
     variants: ['commodity'],
   },
 
+  // Reality variant
+  realityCore: {
+    labelKey: 'header.panelCatRealityCore',
+    panelKeys: ['map', 'ai-chat', 'property-feed', 'market-stats'],
+    variants: ['reality'],
+  },
+  realityIntelligence: {
+    labelKey: 'header.panelCatRealityIntelligence',
+    panelKeys: ['reality-news', 'market-analysis', 'legal-regulation', 'czech-economy'],
+    variants: ['reality'],
+  },
+  realityOperations: {
+    labelKey: 'header.panelCatRealityOperations',
+    panelKeys: ['alerts-panel', 'calendar-panel', 'missing-data', 'monitors'],
+    variants: ['reality'],
+  },
+
   // Happy variant
   happyNews: {
     labelKey: 'header.panelCatHappyNews',

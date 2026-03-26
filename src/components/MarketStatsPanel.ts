@@ -1,28 +1,26 @@
 import { Panel } from './Panel';
+import {
+  getRealityPropertySource,
+  subscribeRealityPropertySourceChange,
+} from '@/services/reality-source-settings';
 import { escapeHtml } from '@/utils/sanitize';
 
 type CityStat = {
   city: string;
   count: number;
-  avg_price: number;
-  median_price: number;
-  avg_price_per_m2: number | null;
-  avg_area_m2: number;
-  min_price: number;
-  max_price: number;
-};
-
-type TypeStat = {
-  type: string;
-  count: number;
-  avg_price: number;
+  median_price: number | null;
+  median_price_per_m2: number | null;
+  p10_price_per_m2: number | null;
+  p90_price_per_m2: number | null;
 };
 
 type StatsResponse = {
   total_active: number;
+  sample_size: number;
+  excluded_count: number;
   by_city: CityStat[];
-  by_type: TypeStat[];
   by_source: Record<string, number>;
+  methodology?: string;
   source: string;
 };
 
@@ -30,6 +28,7 @@ const REFRESH_MS = 120 * 1000;
 
 export class MarketStatsPanel extends Panel {
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
+  private unsubscribeSourceChange: (() => void) | null = null;
 
   constructor() {
     super({
@@ -39,11 +38,19 @@ export class MarketStatsPanel extends Panel {
     });
     void this.loadStats();
     this.refreshTimer = setInterval(() => void this.loadStats(), REFRESH_MS);
+    this.unsubscribeSourceChange = subscribeRealityPropertySourceChange(() => {
+      void this.loadStats();
+    });
   }
 
   private async loadStats(): Promise<void> {
     try {
-      const res = await fetch('/api/market-stats');
+      const params = new URLSearchParams();
+      const source = getRealityPropertySource();
+      if (source !== 'all') params.set('source', source);
+      const query = params.toString() ? `?${params.toString()}` : '';
+
+      const res = await fetch(`/api/market-stats${query}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as StatsResponse;
       this.renderStats(data);
@@ -54,19 +61,16 @@ export class MarketStatsPanel extends Panel {
 
   private renderStats(data: StatsResponse): void {
     const cities = data.by_city;
-    const types = data.by_type;
 
     const metricsHtml = [
-      { label: 'Aktivních nabídek', value: String(data.total_active), change: '' },
+      { label: 'Aktivní byty', value: String(data.total_active), change: `${data.sample_size} ve vzorku` },
+      { label: 'Vyřazené outliery', value: String(data.excluded_count), change: 'price=1, extrémy, mimo rozsah' },
       ...cities.slice(0, 3).map((c) => ({
-        label: `Ø cena/m² ${c.city}`,
-        value: c.avg_price_per_m2 ? `${(c.avg_price_per_m2).toLocaleString('cs-CZ')} Kč` : 'N/A',
-        change: `${c.count} nabídek`,
-      })),
-      ...types.slice(0, 2).map((t) => ({
-        label: `${t.type} (Ø cena)`,
-        value: this.formatPrice(t.avg_price),
-        change: `${t.count} ks`,
+        label: `Medián cena/m² ${c.city}`,
+        value: c.median_price_per_m2 ? `${c.median_price_per_m2.toLocaleString('cs-CZ')} Kč` : 'N/A',
+        change: c.p10_price_per_m2 && c.p90_price_per_m2
+          ? `P10–P90 ${this.formatCompactRange(c.p10_price_per_m2, c.p90_price_per_m2)}`
+          : `${c.count} nabídek`,
       })),
     ].map((m) => `
         <div class="market-metric">
@@ -81,25 +85,26 @@ export class MarketStatsPanel extends Panel {
     const cityRows = cities.map((c) => `
       <tr>
         <td class="city-name">${escapeHtml(c.city)}</td>
-        <td class="city-price">${c.avg_price_per_m2 ? (c.avg_price_per_m2).toLocaleString('cs-CZ') + ' Kč' : 'N/A'}</td>
-        <td>${this.formatPrice(c.median_price)}</td>
+        <td class="city-price">${c.median_price_per_m2 ? c.median_price_per_m2.toLocaleString('cs-CZ') + ' Kč' : 'N/A'}</td>
+        <td>${c.p10_price_per_m2 && c.p90_price_per_m2 ? this.formatCompactRange(c.p10_price_per_m2, c.p90_price_per_m2) : 'N/A'}</td>
         <td class="city-volume">${c.count}</td>
       </tr>
     `).join('');
 
-    const sourceInfo = data.source === 'supabase' ? '(živá data)' : '(demo)';
+    const sourceInfo = data.source === 'supabase' ? '(očištěná bytová nabídka)' : '(demo)';
 
     this.setContent(`
       <div class="market-stats-source">${escapeHtml(sourceInfo)}</div>
+      <div class="market-stats-note">Metodika: jen aktivní byty, vyřazené záznamy bez reálné ceny a extrémy mimo rozumný rozsah. Kontrola jednotky podle metodiky ČSÚ v Kč/m².</div>
       <div class="market-stats-grid">${metricsHtml}</div>
       <div class="market-stats-chart">
-        <div class="chart-title">Průměrná cena/m² dle města</div>
+        <div class="chart-title">Medián nabídkové ceny/m² dle města</div>
         ${priceBar}
       </div>
       <div class="market-stats-table">
         <table>
           <thead>
-            <tr><th>Město</th><th>Cena/m²</th><th>Medián</th><th>Nabídek</th></tr>
+            <tr><th>Město</th><th>Medián cena/m²</th><th>P10–P90</th><th>Vzorek</th></tr>
           </thead>
           <tbody>${cityRows}</tbody>
         </table>
@@ -108,12 +113,12 @@ export class MarketStatsPanel extends Panel {
   }
 
   private renderPriceChart(cities: CityStat[]): string {
-    const withPrice = cities.filter((c) => c.avg_price_per_m2 != null);
+    const withPrice = cities.filter((c) => c.median_price_per_m2 != null);
     if (withPrice.length === 0) return '<div class="bar-chart"><em>Žádná data</em></div>';
 
-    const maxPrice = Math.max(...withPrice.map((d) => d.avg_price_per_m2!));
+    const maxPrice = Math.max(...withPrice.map((d) => d.median_price_per_m2 || 0));
     const bars = withPrice.map((d) => {
-      const pct = (d.avg_price_per_m2! / maxPrice) * 100;
+      const pct = ((d.median_price_per_m2 || 0) / maxPrice) * 100;
       const color = d.city === 'Praha' ? '#44ff88' : d.city === 'Brno' ? '#4488ff' : '#ff8844';
       return `
         <div class="bar-row">
@@ -121,7 +126,7 @@ export class MarketStatsPanel extends Panel {
           <div class="bar-track">
             <div class="bar-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div>
           </div>
-          <span class="bar-value">${(d.avg_price_per_m2! / 1000).toFixed(1)}k</span>
+          <span class="bar-value">${((d.median_price_per_m2 || 0) / 1000).toFixed(1)}k</span>
         </div>
       `;
     }).join('');
@@ -140,15 +145,14 @@ export class MarketStatsPanel extends Panel {
     `);
   }
 
-  private formatPrice(price: number): string {
-    if (price >= 1000000) {
-      return (price / 1000000).toFixed(1).replace('.0', '') + ' mil. Kč';
-    }
-    return price.toLocaleString('cs-CZ') + ' Kč';
+  private formatCompactRange(min: number, max: number): string {
+    return `${Math.round(min / 1000)}–${Math.round(max / 1000)}k`;
   }
 
   destroy(): void {
     if (this.refreshTimer) clearInterval(this.refreshTimer);
+    this.unsubscribeSourceChange?.();
+    this.unsubscribeSourceChange = null;
     super.destroy();
   }
 }

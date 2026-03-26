@@ -40,6 +40,8 @@ function brotliPrecompressPlugin(): Plugin {
 
 const activeVariant = process.env.VITE_VARIANT || 'full';
 const activeMeta = VARIANT_META[activeVariant] || VARIANT_META.full;
+const remoteRealityApiTarget = process.env.VITE_REALITY_API_PROXY_TARGET || 'https://worldmonitor-88mo1m3w4-jstudnics-projects.vercel.app';
+const useRemoteRealityApi = process.env.VITE_USE_REMOTE_REALITY_API === '1';
 
 function htmlVariantPlugin(): Plugin {
   return {
@@ -600,6 +602,92 @@ function gpsjamDevPlugin(): Plugin {
   };
 }
 
+function realityApiDevPlugin(): Plugin {
+  const realityRoutes = [
+    ['/api/properties', () => import('./api/properties.js')],
+    ['/api/market-stats', () => import('./api/market-stats.js')],
+    ['/api/alerts', () => import('./api/alerts.js')],
+    ['/api/calendar', () => import('./api/calendar.js')],
+    ['/api/missing-data', () => import('./api/missing-data.js')],
+    ['/api/chat', () => import('./api/chat.js')],
+    ['/api/cron/sync-sreality', () => import('./api/cron/sync-sreality.js')],
+    ['/api/cron/sync-external-listings', () => import('./api/cron/sync-external-listings.js')],
+    ['/api/cron/sync-flatzone-public', () => import('./api/cron/sync-flatzone-public.js')],
+    ['/api/cron/sync-reality-idnes-projects', () => import('./api/cron/sync-reality-idnes-projects.js')],
+    ['/api/cron/run-monitor-digests', () => import('./api/cron/run-monitor-digests.js')],
+    ['/api/cron/run-openclaw-ops-heartbeat', () => import('./api/cron/run-openclaw-ops-heartbeat.js')],
+  ] as const;
+
+  function matchRealityRoute(url: string | undefined) {
+    if (!url || activeVariant !== 'reality' || useRemoteRealityApi) return null;
+    return realityRoutes.find(([route]) => url === route || url.startsWith(`${route}?`)) || null;
+  }
+
+  return {
+    name: 'reality-api-dev',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const matched = matchRealityRoute(req.url);
+        if (!matched) {
+          return next();
+        }
+
+        try {
+          const [, loader] = matched;
+          const mod = await loader();
+          const handler = mod?.default;
+          if (typeof handler !== 'function') {
+            throw new Error(`Route handler for ${matched[0]} is missing a default export.`);
+          }
+
+          const port = server.config.server.port || 3000;
+          const url = new URL(req.url!, `http://localhost:${port}`);
+
+          let body: string | undefined;
+          if (req.method && ['POST', 'PUT', 'PATCH'].includes(req.method)) {
+            const chunks: Buffer[] = [];
+            for await (const chunk of req) {
+              chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+            }
+            body = Buffer.concat(chunks).toString();
+          }
+
+          const headers: Record<string, string> = {};
+          for (const [key, value] of Object.entries(req.headers)) {
+            if (typeof value === 'string') {
+              headers[key] = value;
+            } else if (Array.isArray(value)) {
+              headers[key] = value.join(', ');
+            }
+          }
+
+          const webRequest = new Request(url.toString(), {
+            method: req.method,
+            headers,
+            body: body || undefined,
+          });
+
+          const response = await handler(webRequest);
+          res.statusCode = response.status;
+          response.headers.forEach((value: string, key: string) => {
+            res.setHeader(key, value);
+          });
+
+          const buffer = Buffer.from(await response.arrayBuffer());
+          res.end(buffer);
+        } catch (error: any) {
+          console.error('[reality-api-dev]', req.url, error?.message || error);
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({
+            error: error?.message || 'Reality API dev handler failed',
+          }));
+        }
+      });
+    },
+  };
+}
+
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
@@ -610,6 +698,7 @@ export default defineConfig({
     rssProxyPlugin(),
     youtubeLivePlugin(),
     gpsjamDevPlugin(),
+    realityApiDevPlugin(),
     sebufApiPlugin(),
     brotliPrecompressPlugin(),
     VitePWA({
@@ -831,13 +920,17 @@ export default defineConfig({
       ],
     },
     proxy: {
-      // Reality variant API routes (Vercel Edge Functions proxied to deployed instance)
-      '/api/properties': { target: 'https://worldmonitor-eta-sand.vercel.app', changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
-      '/api/market-stats': { target: 'https://worldmonitor-eta-sand.vercel.app', changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
-      '/api/alerts': { target: 'https://worldmonitor-eta-sand.vercel.app', changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
-      '/api/calendar': { target: 'https://worldmonitor-eta-sand.vercel.app', changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
-      '/api/missing-data': { target: 'https://worldmonitor-eta-sand.vercel.app', changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
-      '/api/chat': { target: 'https://worldmonitor-eta-sand.vercel.app', changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
+      // When explicitly enabled, proxy reality APIs to the deployed instance.
+      // For local `vercel dev`, leave these routes unproxied so local API handlers
+      // can talk to Supabase and the OpenClaw adapter directly.
+      ...(useRemoteRealityApi ? {
+        '/api/properties': { target: remoteRealityApiTarget, changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
+        '/api/market-stats': { target: remoteRealityApiTarget, changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
+        '/api/alerts': { target: remoteRealityApiTarget, changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
+        '/api/calendar': { target: remoteRealityApiTarget, changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
+        '/api/missing-data': { target: remoteRealityApiTarget, changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
+        '/api/chat': { target: remoteRealityApiTarget, changeOrigin: true, headers: { 'User-Agent': 'Mozilla/5.0 WorldMonitor-Dev' } },
+      } : {}),
       // Yahoo Finance API
       '/api/yahoo': {
         target: 'https://query1.finance.yahoo.com',

@@ -1,6 +1,8 @@
 import { insertRows, isConfigured, queryTable, updateRows } from '../_supabase.js';
+import { enrichMonitorDigestWithOpenClaw } from '../_openclaw.js';
+import { formatPortalLabel } from '../_portal-sources.js';
 
-export const config = { runtime: 'edge', maxDuration: 60 };
+export const config = { runtime: 'nodejs', maxDuration: 60 };
 
 const DEFAULT_TIMEZONE = 'Europe/Prague';
 const DEFAULT_LOOKBACK_HOURS = 30;
@@ -60,6 +62,19 @@ const DEMO_PORTAL_LISTINGS = [
     is_competitor: true,
     notes: 'Praha Karlín',
   },
+  {
+    id: 'portal-demo-5',
+    portal: 'flatzone',
+    title: 'Projekt Nové Holešovice',
+    price: 5890000,
+    city: 'Praha',
+    district: 'Holešovice',
+    url: 'https://www.flatzone.cz/projekt/nove-holesovice-demo-5',
+    first_seen_at: '2026-03-23T04:35:00.000Z',
+    last_seen_at: '2026-03-23T04:35:00.000Z',
+    is_competitor: true,
+    notes: 'Developerský projekt · Praha Holešovice',
+  },
 ];
 
 function asDate(value) {
@@ -111,18 +126,6 @@ function formatDateTimeCs(value, timeZone = DEFAULT_TIMEZONE) {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-function formatPortalLabel(value) {
-  const normalized = normalizeText(value);
-  const labels = {
-    sreality: 'Sreality',
-    bezrealitky: 'Bezrealitky',
-    reality_idnes: 'Reality.iDNES',
-    dashboard: 'Dashboard',
-    email: 'E-mail',
-  };
-  return labels[normalized] || (value ? String(value) : 'Neznámý zdroj');
 }
 
 function getDateKeyInTimezone(date, timeZone = DEFAULT_TIMEZONE) {
@@ -486,6 +489,7 @@ export default async function handler(req) {
     alertsCreated: 0,
     artifactsCreated: 0,
     emailsSent: 0,
+    agentEnriched: 0,
     errors: [],
     monitors: [],
   };
@@ -529,6 +533,29 @@ export default async function handler(req) {
         );
 
         const digestPayload = buildDigestPayload(monitor, filteredListings, listingsRes.source, now.toISOString());
+        const openClawDigest = await enrichMonitorDigestWithOpenClaw({
+          monitor,
+          listings: filteredListings,
+          summaryText: digestPayload.summaryText,
+          source: listingsRes.source,
+        });
+
+        if (openClawDigest) {
+          digestPayload.summaryText = openClawDigest.summary;
+          digestPayload.payload.summary = openClawDigest.summary;
+          digestPayload.payload.agent = {
+            runtime: 'openclaw',
+            model: openClawDigest.model || null,
+            next_steps: openClawDigest.nextSteps,
+          };
+          if (openClawDigest.alertDescription) {
+            digestPayload.alertDescription = openClawDigest.alertDescription;
+          }
+          if (openClawDigest.headline) {
+            digestPayload.payload.headline = openClawDigest.headline;
+          }
+          results.agentEnriched += 1;
+        }
         let artifactId = null;
         let alertId = null;
         let emailStatus = { status: 'skipped', reason: 'channel_disabled' };
@@ -575,6 +602,7 @@ export default async function handler(req) {
           status: 'processed',
           listings: filteredListings.length,
           channels: statusParts,
+          openclaw: Boolean(openClawDigest),
           artifactId,
           alertId,
         });

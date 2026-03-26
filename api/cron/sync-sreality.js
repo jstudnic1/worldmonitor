@@ -1,7 +1,8 @@
 // Vercel Cron: Sync listings from Sreality.cz API into Supabase
 // Schedule: daily morning refresh (configured in vercel.json)
 
-import { isConfigured, insertRows, queryTable } from '../_supabase.js';
+import { importNormalizedListings } from '../_listing-ingest.js';
+import { isConfigured } from '../_supabase.js';
 
 export const config = { runtime: 'edge', maxDuration: 60 };
 
@@ -57,10 +58,39 @@ function extractRooms(name) {
   return match ? match[1] : null;
 }
 
-/**
- * Convert a Sreality estate to our property format
- */
-function mapSrealityToProperty(estate, type) {
+function parseAreaSqm(value) {
+  const text = String(value || '');
+  const match = text.match(/(\d[\d\s.,]*)\s*m²/i);
+  if (!match?.[1]) return 0;
+
+  const normalized = match[1]
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s+/g, '')
+    .replace(',', '.');
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function buildSrealityUrl(estate) {
+  if (estate?.seo?.href) {
+    return `https://www.sreality.cz${estate.seo.href}`;
+  }
+
+  if (estate?._links?.self?.href) {
+    const href = String(estate._links.self.href).trim();
+    if (!href) return null;
+    return href.startsWith('http') ? href : `https://www.sreality.cz/api${href}`;
+  }
+
+  if (estate?.hash_id) {
+    return `https://www.sreality.cz/api/cs/v2/estates/${estate.hash_id}`;
+  }
+
+  return null;
+}
+
+function mapSrealityEstate(estate, type) {
   const gps = estate.gps || {};
   const price = estate.price || 0;
   const name = estate.name || '';
@@ -75,29 +105,29 @@ function mapSrealityToProperty(estate, type) {
   let areaSqm = 0;
   if (estate.labels) {
     for (const label of estate.labels) {
-      const areaMatch = label.match(/(\d+)\s*m²/);
-      if (areaMatch) {
-        areaSqm = parseInt(areaMatch[1], 10);
+      areaSqm = parseAreaSqm(label);
+      if (areaSqm) {
         break;
       }
     }
   }
   // Fallback: check name for area
   if (!areaSqm) {
-    const nameAreaMatch = name.match(/(\d+)\s*m²/);
-    if (nameAreaMatch) areaSqm = parseInt(nameAreaMatch[1], 10);
+    areaSqm = parseAreaSqm(name);
   }
 
   const pricePerM2 = areaSqm > 0 ? Math.round(price / areaSqm) : null;
   const rooms = extractRooms(name);
 
   return {
+    external_id: estate.hash_id ? String(estate.hash_id) : (estate.seo?.href || estate.name || `sreality-${Date.now()}`),
     title: name,
+    listing_kind: 'listing',
     type,
     status: 'aktivní',
     price,
     price_per_m2: pricePerM2,
-    area_m2: areaSqm || 1,
+    area_m2: areaSqm || null,
     rooms,
     city,
     district,
@@ -105,30 +135,9 @@ function mapSrealityToProperty(estate, type) {
     lat: gps.lat || null,
     lon: gps.lon || null,
     description: null, // detail endpoint needed for full description
-    source: 'sreality',
-    source_url: estate.seo?.href ? `https://www.sreality.cz${estate.seo.href}` : null,
+    url: buildSrealityUrl(estate),
     listed_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-  };
-}
-
-function mapSrealityToPortalListing(estate) {
-  const locality = estate.locality || '';
-  const localityParts = locality.split(',').map(s => s.trim()).filter(Boolean);
-  const city = localityParts[localityParts.length - 1] || 'Unknown';
-  const district = localityParts[0] || city;
-  const sourceUrl = estate.seo?.href ? `https://www.sreality.cz${estate.seo.href}` : null;
-
-  return {
-    portal: 'sreality',
-    external_id: estate.hash_id ? String(estate.hash_id) : (sourceUrl || estate.name || `sreality-${Date.now()}`),
-    title: estate.name || 'Bez názvu',
-    price: estate.price || null,
-    city,
-    district,
-    url: sourceUrl,
-    first_seen_at: new Date().toISOString(),
-    last_seen_at: new Date().toISOString(),
     is_competitor: true,
     notes: locality || null,
   };
@@ -152,18 +161,6 @@ export default async function handler(req) {
   const results = { fetched: 0, inserted: 0, errors: [] };
 
   try {
-    // Get existing source_urls to avoid duplicates in properties
-    const existingProperties = await queryTable(
-      'properties',
-      'select=source_url&source=eq.sreality&source_url=not.is.null'
-    );
-    const existingPropertyUrls = new Set(existingProperties.map(p => p.source_url));
-    const existingPortalRows = await queryTable(
-      'portal_listings',
-      'select=url&portal=eq.sreality&url=not.is.null'
-    );
-    const existingPortalUrls = new Set(existingPortalRows.map(p => p.url));
-
     for (const cat of CATEGORIES) {
       for (const region of REGIONS) {
         try {
@@ -178,38 +175,14 @@ export default async function handler(req) {
           const estates = data._embedded?.estates || [];
           results.fetched += estates.length;
 
-          // Map and filter new listings
-          const newProperties = estates
-            .map(e => mapSrealityToProperty(e, cat.type))
-            .filter(p => p.price > 0)
-            .filter(p => !p.source_url || !existingPropertyUrls.has(p.source_url));
+          const syncResult = await importNormalizedListings({
+            portal: 'sreality',
+            listings: estates
+              .map((estate) => mapSrealityEstate(estate, cat.type))
+              .filter((listing) => Number(listing.price || 0) > 0),
+          });
 
-          const newPortalListings = estates
-            .map(e => mapSrealityToPortalListing(e))
-            .filter(listing => listing.url)
-            .filter(listing => !existingPortalUrls.has(listing.url));
-
-          if (newProperties.length > 0) {
-            await insertRows('properties', newProperties);
-            results.inserted += newProperties.length;
-            newProperties.forEach(property => {
-              if (property.source_url) existingPropertyUrls.add(property.source_url);
-            });
-
-            // Also create alerts for new listings
-            const alerts = newProperties.slice(0, 5).map(p => ({
-              type: 'new_listing',
-              title: `Nová nabídka: ${p.title}`,
-              description: `${p.city}, ${p.district} — ${p.price.toLocaleString('cs-CZ')} Kč, ${p.area_m2} m²`,
-              severity: 'medium',
-            }));
-            await insertRows('alerts', alerts);
-          }
-
-          if (newPortalListings.length > 0) {
-            await insertRows('portal_listings', newPortalListings);
-            newPortalListings.forEach(listing => existingPortalUrls.add(listing.url));
-          }
+          results.inserted += syncResult.insertedProperties;
         } catch (err) {
           results.errors.push(`${cat.label} ${region.name}: ${err.message}`);
         }

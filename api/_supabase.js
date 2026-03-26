@@ -17,15 +17,32 @@ export function isConfigured() {
   return Boolean(SUPABASE_URL && SUPABASE_KEY);
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 0) {
+  if (!timeoutMs || timeoutMs <= 0) {
+    return fetch(url, options);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error(`Supabase fetch timed out after ${timeoutMs} ms`)), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Execute a PostgREST query against Supabase.
  * @param {string} table - Table name
  * @param {string} query - PostgREST query string (e.g. "select=*&city=eq.Praha&order=price.desc&limit=20")
  * @returns {Promise<any[]>}
  */
-export async function queryTable(table, query = 'select=*') {
+export async function queryTable(table, query = 'select=*', options = {}) {
   const url = `${SUPABASE_URL}/rest/v1/${table}?${query}`;
-  const res = await fetch(url, { headers: supabaseHeaders() });
+  const res = await fetchWithTimeout(url, { headers: supabaseHeaders() }, options.timeoutMs);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Supabase query failed: ${res.status} ${text}`);
@@ -47,11 +64,11 @@ export async function insertRows(table, data, options = {}) {
   const url = options.onConflict
     ? `${SUPABASE_URL}/rest/v1/${table}?on_conflict=${options.onConflict}`
     : `${SUPABASE_URL}/rest/v1/${table}`;
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: 'POST',
     headers,
     body: JSON.stringify(Array.isArray(data) ? data : [data]),
-  });
+  }, options.timeoutMs);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Supabase insert failed: ${res.status} ${text}`);
@@ -67,7 +84,7 @@ export async function insertRows(table, data, options = {}) {
  */
 export async function updateRows(table, matchQuery, data) {
   const url = `${SUPABASE_URL}/rest/v1/${table}?${matchQuery}`;
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: 'PATCH',
     headers: supabaseHeaders(),
     body: JSON.stringify(data),
@@ -86,7 +103,7 @@ export async function updateRows(table, matchQuery, data) {
  */
 export async function callRpc(fnName, params = {}) {
   const url = `${SUPABASE_URL}/rest/v1/rpc/${fnName}`;
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: 'POST',
     headers: supabaseHeaders(),
     body: JSON.stringify(params),

@@ -192,7 +192,7 @@ CREATE TABLE IF NOT EXISTS price_history (
 -- Portal monitoring (monitoring portálů)
 CREATE TABLE IF NOT EXISTS portal_listings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  portal TEXT NOT NULL CHECK (portal IN ('sreality', 'bezrealitky', 'reality_idnes', 'other')),
+  portal TEXT NOT NULL CHECK (portal ~ '^[a-z0-9_:-]+$'),
   external_id TEXT,
   title TEXT NOT NULL,
   price NUMERIC,
@@ -222,6 +222,9 @@ ALTER TABLE saved_monitors ADD COLUMN IF NOT EXISTS delivery_target TEXT;
 ALTER TABLE saved_monitors ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'Europe/Prague';
 ALTER TABLE saved_monitors ADD COLUMN IF NOT EXISTS last_digest_at TIMESTAMPTZ;
 ALTER TABLE saved_monitors ADD COLUMN IF NOT EXISTS last_run_status TEXT;
+
+ALTER TABLE portal_listings DROP CONSTRAINT IF EXISTS portal_listings_portal_check;
+ALTER TABLE portal_listings ADD CONSTRAINT portal_listings_portal_check CHECK (portal ~ '^[a-z0-9_:-]+$');
 
 -- =============================================================================
 -- INDEXES

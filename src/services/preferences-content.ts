@@ -6,9 +6,16 @@ import { getGlobeVisualPreset, setGlobeVisualPreset, GLOBE_VISUAL_PRESET_OPTIONS
 import type { StreamQuality } from '@/services/ai-flow-settings';
 import { getThemePreference, setThemePreference, type ThemePreference } from '@/utils/theme-manager';
 import { getFontFamily, setFontFamily, type FontFamily } from '@/services/font-settings';
+import {
+  getRealityPropertySource,
+  setRealityPropertySource,
+  REALITY_PROPERTY_SOURCE_OPTIONS,
+  type RealityPropertySource,
+} from '@/services/reality-source-settings';
 import { escapeHtml } from '@/utils/sanitize';
 import { trackLanguageChange } from '@/services/analytics';
 import { exportSettings, importSettings, type ImportResult } from '@/utils/settings-persistence';
+import { SITE_VARIANT } from '@/config/variant';
 
 const DESKTOP_RELEASES_URL = 'https://github.com/koala73/worldmonitor/releases';
 
@@ -71,6 +78,7 @@ function updateAiStatus(container: HTMLElement): void {
 export function renderPreferences(host: PreferencesHost): PreferencesResult {
   const settings = getAiFlowSettings();
   const currentLang = getCurrentLanguage();
+  const isRealityVariant = SITE_VARIANT === 'reality';
   let html = '';
 
   // ── Display group ──
@@ -145,22 +153,23 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
   }
   html += `</select>`;
 
-  html += toggleRowHtml('us-map-flash', t('components.insights.mapFlashLabel'), t('components.insights.mapFlashDesc'), settings.mapNewsFlash);
+  if (!isRealityVariant) {
+    html += toggleRowHtml('us-map-flash', t('components.insights.mapFlashLabel'), t('components.insights.mapFlashDesc'), settings.mapNewsFlash);
 
-  // 3D Globe Visual Preset
-  const currentPreset = getGlobeVisualPreset();
-  html += `<div class="ai-flow-toggle-row">
-    <div class="ai-flow-toggle-label-wrap">
-      <div class="ai-flow-toggle-label">${t('preferences.globePreset')}</div>
-      <div class="ai-flow-toggle-desc">${t('preferences.globePresetDesc')}</div>
-    </div>
-  </div>`;
-  html += `<select class="unified-settings-select" id="us-globe-visual-preset">`;
-  for (const opt of GLOBE_VISUAL_PRESET_OPTIONS) {
-    const selected = opt.value === currentPreset ? ' selected' : '';
-    html += `<option value="${opt.value}"${selected}>${escapeHtml(opt.label)}</option>`;
+    const currentPreset = getGlobeVisualPreset();
+    html += `<div class="ai-flow-toggle-row">
+      <div class="ai-flow-toggle-label-wrap">
+        <div class="ai-flow-toggle-label">${t('preferences.globePreset')}</div>
+        <div class="ai-flow-toggle-desc">${t('preferences.globePresetDesc')}</div>
+      </div>
+    </div>`;
+    html += `<select class="unified-settings-select" id="us-globe-visual-preset">`;
+    for (const opt of GLOBE_VISUAL_PRESET_OPTIONS) {
+      const selected = opt.value === currentPreset ? ' selected' : '';
+      html += `<option value="${opt.value}"${selected}>${escapeHtml(opt.label)}</option>`;
+    }
+    html += `</select>`;
   }
-  html += `</select>`;
 
   // Language
   html += `<div class="ai-flow-section-label">${t('header.languageLabel')}</div>`;
@@ -176,67 +185,81 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
 
   html += `</div></details>`;
 
-  // ── Intelligence group ──
-  html += `<details class="wm-pref-group">`;
-  html += `<summary>${t('preferences.intelligence')}</summary>`;
-  html += `<div class="wm-pref-group-content">`;
+  if (!isRealityVariant) {
+    html += `<details class="wm-pref-group">`;
+    html += `<summary>${t('preferences.intelligence')}</summary>`;
+    html += `<div class="wm-pref-group-content">`;
 
-  if (!host.isDesktopApp) {
-    html += toggleRowHtml('us-cloud', t('components.insights.aiFlowCloudLabel'), t('components.insights.aiFlowCloudDesc'), settings.cloudLlm);
-    html += toggleRowHtml('us-browser', t('components.insights.aiFlowBrowserLabel'), t('components.insights.aiFlowBrowserDesc'), settings.browserModel);
-    html += `<div class="ai-flow-toggle-warn" style="display:${settings.browserModel ? 'block' : 'none'}">${t('components.insights.aiFlowBrowserWarn')}</div>`;
-    html += `
-      <div class="ai-flow-cta">
-        <div class="ai-flow-cta-title">${t('components.insights.aiFlowOllamaCta')}</div>
-        <div class="ai-flow-cta-desc">${t('components.insights.aiFlowOllamaCtaDesc')}</div>
-        <a href="${DESKTOP_RELEASES_URL}" target="_blank" rel="noopener noreferrer" class="ai-flow-cta-link">${t('components.insights.aiFlowDownloadDesktop')}</a>
+    if (!host.isDesktopApp) {
+      html += toggleRowHtml('us-cloud', t('components.insights.aiFlowCloudLabel'), t('components.insights.aiFlowCloudDesc'), settings.cloudLlm);
+      html += toggleRowHtml('us-browser', t('components.insights.aiFlowBrowserLabel'), t('components.insights.aiFlowBrowserDesc'), settings.browserModel);
+      html += `<div class="ai-flow-toggle-warn" style="display:${settings.browserModel ? 'block' : 'none'}">${t('components.insights.aiFlowBrowserWarn')}</div>`;
+      html += `
+        <div class="ai-flow-cta">
+          <div class="ai-flow-cta-title">${t('components.insights.aiFlowOllamaCta')}</div>
+          <div class="ai-flow-cta-desc">${t('components.insights.aiFlowOllamaCtaDesc')}</div>
+          <a href="${DESKTOP_RELEASES_URL}" target="_blank" rel="noopener noreferrer" class="ai-flow-cta-link">${t('components.insights.aiFlowDownloadDesktop')}</a>
+        </div>
+      `;
+    }
+
+    html += toggleRowHtml('us-headline-memory', t('components.insights.headlineMemoryLabel'), t('components.insights.headlineMemoryDesc'), settings.headlineMemory);
+
+    html += `</div></details>`;
+
+    html += `<details class="wm-pref-group">`;
+    html += `<summary>${t('preferences.media')}</summary>`;
+    html += `<div class="wm-pref-group-content">`;
+
+    const currentQuality = getStreamQuality();
+    html += `<div class="ai-flow-toggle-row">
+      <div class="ai-flow-toggle-label-wrap">
+        <div class="ai-flow-toggle-label">${t('components.insights.streamQualityLabel')}</div>
+        <div class="ai-flow-toggle-desc">${t('components.insights.streamQualityDesc')}</div>
       </div>
-    `;
+    </div>`;
+    html += `<select class="unified-settings-select" id="us-stream-quality">`;
+    for (const opt of STREAM_QUALITY_OPTIONS) {
+      const selected = opt.value === currentQuality ? ' selected' : '';
+      html += `<option value="${opt.value}"${selected}>${escapeHtml(opt.label)}</option>`;
+    }
+    html += `</select>`;
+
+    html += toggleRowHtml(
+      'us-live-streams-always-on',
+      t('components.insights.streamAlwaysOnLabel'),
+      t('components.insights.streamAlwaysOnDesc'),
+      getLiveStreamsAlwaysOn(),
+    );
+
+    html += `</div></details>`;
+
+    html += `<details class="wm-pref-group">`;
+    html += `<summary>${t('preferences.panels')}</summary>`;
+    html += `<div class="wm-pref-group-content">`;
+    html += toggleRowHtml('us-badge-anim', t('components.insights.badgeAnimLabel'), t('components.insights.badgeAnimDesc'), settings.badgeAnimation);
+    html += `</div></details>`;
   }
-
-  html += toggleRowHtml('us-headline-memory', t('components.insights.headlineMemoryLabel'), t('components.insights.headlineMemoryDesc'), settings.headlineMemory);
-
-  html += `</div></details>`;
-
-  // ── Media group ──
-  html += `<details class="wm-pref-group">`;
-  html += `<summary>${t('preferences.media')}</summary>`;
-  html += `<div class="wm-pref-group-content">`;
-
-  const currentQuality = getStreamQuality();
-  html += `<div class="ai-flow-toggle-row">
-    <div class="ai-flow-toggle-label-wrap">
-      <div class="ai-flow-toggle-label">${t('components.insights.streamQualityLabel')}</div>
-      <div class="ai-flow-toggle-desc">${t('components.insights.streamQualityDesc')}</div>
-    </div>
-  </div>`;
-  html += `<select class="unified-settings-select" id="us-stream-quality">`;
-  for (const opt of STREAM_QUALITY_OPTIONS) {
-    const selected = opt.value === currentQuality ? ' selected' : '';
-    html += `<option value="${opt.value}"${selected}>${escapeHtml(opt.label)}</option>`;
-  }
-  html += `</select>`;
-
-  html += toggleRowHtml(
-    'us-live-streams-always-on',
-    t('components.insights.streamAlwaysOnLabel'),
-    t('components.insights.streamAlwaysOnDesc'),
-    getLiveStreamsAlwaysOn(),
-  );
-
-  html += `</div></details>`;
-
-  // ── Panels group ──
-  html += `<details class="wm-pref-group">`;
-  html += `<summary>${t('preferences.panels')}</summary>`;
-  html += `<div class="wm-pref-group-content">`;
-  html += toggleRowHtml('us-badge-anim', t('components.insights.badgeAnimLabel'), t('components.insights.badgeAnimDesc'), settings.badgeAnimation);
-  html += `</div></details>`;
 
   // ── Data & Community group ──
   html += `<details class="wm-pref-group">`;
-  html += `<summary>${t('preferences.dataAndCommunity')}</summary>`;
+  html += `<summary>${isRealityVariant ? t('preferences.data') : t('preferences.dataAndCommunity')}</summary>`;
   html += `<div class="wm-pref-group-content">`;
+  if (isRealityVariant) {
+    const currentSource = getRealityPropertySource();
+    html += `<div class="ai-flow-toggle-row">
+      <div class="ai-flow-toggle-label-wrap">
+        <div class="ai-flow-toggle-label">Zdroj nemovitostí</div>
+        <div class="ai-flow-toggle-desc">Filtruje mapu a seznam nabídek podle vybraného portálu.</div>
+      </div>
+    </div>`;
+    html += `<select class="unified-settings-select" id="us-reality-property-source">`;
+    for (const opt of REALITY_PROPERTY_SOURCE_OPTIONS) {
+      const selected = opt.value === currentSource ? ' selected' : '';
+      html += `<option value="${opt.value}"${selected}>${escapeHtml(opt.label)}</option>`;
+    }
+    html += `</select>`;
+  }
   html += `
     <div class="us-data-mgmt">
       <button type="button" class="settings-btn settings-btn-secondary" id="usExportBtn">${t('components.settings.exportSettings')}</button>
@@ -245,14 +268,16 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
     </div>
     <div class="us-data-mgmt-toast" id="usDataMgmtToast"></div>
   `;
-  html += `<a href="https://github.com/koala73/worldmonitor/discussions/94" target="_blank" rel="noopener noreferrer" class="us-discussion-link">
-    <span class="us-discussion-dot"></span>
-    <span>${t('components.community.joinDiscussion')}</span>
-  </a>`;
+  if (!isRealityVariant) {
+    html += `<a href="https://github.com/koala73/worldmonitor/discussions/94" target="_blank" rel="noopener noreferrer" class="us-discussion-link">
+      <span class="us-discussion-dot"></span>
+      <span>${t('components.community.joinDiscussion')}</span>
+    </a>`;
+  }
   html += `</div></details>`;
 
   // AI status footer (web-only)
-  if (!host.isDesktopApp) {
+  if (!host.isDesktopApp && !isRealityVariant) {
     html += `<div class="ai-flow-popup-footer"><span class="ai-flow-status-dot" id="usStatusDot"></span><span class="ai-flow-status-text" id="usStatusText"></span></div>`;
   }
 
@@ -305,6 +330,10 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
           const provider = getMapProvider();
           setMapTheme(provider, target.value);
           window.dispatchEvent(new CustomEvent('map-theme-changed'));
+          return;
+        }
+        if (target.id === 'us-reality-property-source') {
+          setRealityPropertySource(target.value as RealityPropertySource);
           return;
         }
         if (target.id === 'us-live-streams-always-on') {

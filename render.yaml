@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: reality-chat-service
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./deploy/reality-chat-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: anthropic/claude-4.6-sonnet-20260217
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: REALITY_CHAT_SERVICE_KEY
+        sync: false
+      - key: CHAT_FORCE_DEMO_MODE
+        value: "0"
+      - key: OPENROUTER_TIMEOUT_MS
+        value: "12000"

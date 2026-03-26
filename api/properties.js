@@ -15,6 +15,10 @@ const DEMO_PROPERTIES = [
   { id: '8', title: 'Pozemek, Říčany', type: 'pozemek', price: 3600000, price_per_m2: 4500, area_m2: 800, rooms: '-', city: 'Říčany', district: 'Praha-východ', status: 'aktivní', listed_at: '2026-03-15', lat: 49.9908, lon: 14.6539, source: 'internal' },
 ];
 
+function hasPresentablePrice(property) {
+  return Number(property?.price || 0) > 1;
+}
+
 export default async function handler(req) {
   const cors = getCorsHeaders(req, 'GET, OPTIONS');
 
@@ -50,13 +54,14 @@ export default async function handler(req) {
       // 'sale' or no type: return all active listings
 
       if (status) parts.push(`status=eq.${status}`);
+      parts.push('price=gt.1');
       if (minPrice) parts.push(`price=gte.${minPrice}`);
       if (maxPrice) parts.push(`price=lte.${maxPrice}`);
       if (source) parts.push(`source=eq.${source}`);
       parts.push('order=listed_at.desc');
       parts.push(`limit=${limit}`);
 
-      const properties = await queryTable('properties', parts.join('&'));
+      const properties = (await queryTable('properties', parts.join('&'))).filter(hasPresentablePrice);
 
       return new Response(JSON.stringify({ properties, total: properties.length, source: 'supabase' }), {
         status: 200,
@@ -69,10 +74,11 @@ export default async function handler(req) {
   }
 
   // Fallback: demo data
-  let filtered = DEMO_PROPERTIES;
+  let filtered = DEMO_PROPERTIES.filter(hasPresentablePrice);
   if (city) filtered = filtered.filter(p => p.city.toLowerCase().includes(city.toLowerCase()));
   if (minPrice) filtered = filtered.filter(p => p.price >= Number(minPrice));
   if (maxPrice) filtered = filtered.filter(p => p.price <= Number(maxPrice));
+  if (source) filtered = filtered.filter(p => p.source === source);
 
   return new Response(JSON.stringify({ properties: filtered, total: filtered.length, source: 'demo' }), {
     status: 200,

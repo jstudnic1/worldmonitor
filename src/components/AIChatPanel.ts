@@ -143,6 +143,13 @@ const CHAT_HISTORY_KEY = 'reality-chat-history';
 const CHAT_AGENT_MODE_KEY = 'reality-chat-agent-mode';
 const MAX_HISTORY = 50;
 
+function normalizePrompt(value: string): string {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
 export class AIChatPanel extends Panel {
   private messages: ChatMessage[] = [];
   private inputEl: HTMLTextAreaElement | null = null;
@@ -193,6 +200,239 @@ export class AIChatPanel extends Panel {
 
   private saveHistory(): void {
     localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(this.messages.slice(-MAX_HISTORY)));
+  }
+
+  private buildLocalAutoResponse(text: string): { content: string; result: StructuredResult } {
+    const normalized = normalizePrompt(text);
+
+    if ((normalized.includes('nov') && normalized.includes('klient')) || normalized.includes('klienti q1')) {
+      return {
+        content: 'Za 1. kvartál eviduji 18 nových klientů. Nejvíce přišli z portálů, doporučení a přímých webových poptávek.',
+        result: {
+          title: 'Noví klienti za 1. kvartál',
+          summary: 'Rychlý přehled akvizičních zdrojů a tempa přísunu klientů.',
+          source: 'demo',
+          artifacts: [
+            {
+              kind: 'metrics',
+              title: 'Souhrn',
+              metrics: [
+                { label: 'Noví klienti', value: '18' },
+                { label: 'Největší zdroj', value: 'Reality portály' },
+                { label: 'Doporučení', value: '28 %', tone: 'positive' },
+              ],
+            },
+            {
+              kind: 'table',
+              title: 'Zdroje klientů',
+              columns: ['Zdroj', 'Počet', 'Podíl'],
+              rows: [
+                ['Portály', '7', '39 %'],
+                ['Doporučení', '5', '28 %'],
+                ['Web / direct', '4', '22 %'],
+                ['Sociální sítě', '2', '11 %'],
+              ],
+            },
+          ],
+          nextSteps: [
+            'Zesilte follow-up u doporučení, mají nejlepší konverzi.',
+            'U webových leadů doplňte konzistentní source tagging.',
+          ],
+        },
+      };
+    }
+
+    if ((normalized.includes('lead') && normalized.includes('prodej')) || normalized.includes('leady vs prodeje')) {
+      return {
+        content: 'Za posledních 6 měsíců je v pipeline vidět stabilní růst leadů a pozvolný nárůst uzavřených prodejů.',
+        result: {
+          title: 'Leady vs prodané nemovitosti',
+          summary: 'Srovnání akviziční pipeline a uzavřených obchodů za posledních 6 měsíců.',
+          source: 'demo',
+          artifacts: [
+            {
+              kind: 'chart',
+              title: 'Vývoj pipeline',
+              chartType: 'line',
+              labels: ['Říj', 'Lis', 'Pro', 'Led', 'Úno', 'Bře'],
+              unit: 'počet',
+              series: [
+                { name: 'Leady', values: [14, 16, 18, 22, 25, 28] },
+                { name: 'Prodeje', values: [5, 6, 7, 8, 9, 11] },
+              ],
+            },
+            {
+              kind: 'metrics',
+              title: 'KPI',
+              metrics: [
+                { label: 'Leady', value: '123' },
+                { label: 'Prodeje', value: '50' },
+                { label: 'Closing rate', value: '41 %', tone: 'positive' },
+              ],
+            },
+          ],
+          nextSteps: [
+            'Zkontrolujte kvalitu leadů z posledních 2 měsíců.',
+            'Porovnejte closing rate po zdrojích akvizice.',
+          ],
+        },
+      };
+    }
+
+    if ((normalized.includes('email') || normalized.includes('e-mail')) && (normalized.includes('prohlid') || normalized.includes('termin') || normalized.includes('kalendar'))) {
+      return {
+        content: 'Připravil jsem návrh e-mailu a vytáhl 3 vhodné sloty pro prohlídku podle kalendáře.',
+        result: {
+          title: 'Návrh e-mailu pro zájemce',
+          summary: 'Koncept e-mailu s doporučenými termíny prohlídky.',
+          source: 'demo',
+          artifacts: [
+            {
+              kind: 'email',
+              title: 'E-mailový koncept',
+              subject: 'Návrh termínu prohlídky nemovitosti',
+              to: 'Jan Novák',
+              body: 'Dobrý den,\n\nna základě Vašeho zájmu o nemovitost Vám mohu nabídnout tyto termíny prohlídky:\n- Čt 16:00\n- Pá 10:30\n- Po 14:00\n\nPokud Vám některý z termínů vyhovuje, prosím potvrďte jej odpovědí na tento e-mail.\n\nS pozdravem\nReality Monitor',
+              suggestedSlots: ['Čt 16:00', 'Pá 10:30', 'Po 14:00'],
+            },
+          ],
+          nextSteps: [
+            'Po potvrzení slotu založte událost do kalendáře.',
+            'Doplňte ke zprávě adresu a parkovací instrukce.',
+          ],
+        },
+      };
+    }
+
+    if ((normalized.includes('rekonstruk') || normalized.includes('stavebn')) && (normalized.includes('chybi') || normalized.includes('doplnen'))) {
+      return {
+        content: 'Našel jsem 2 aktivní nemovitosti, kde chybí údaje o rekonstrukci nebo stavebních úpravách.',
+        result: {
+          title: 'Chybějící data o rekonstrukcích',
+          summary: 'Přehled nabídek, kde je potřeba doplnit provozně důležitá data před další prezentací klientům.',
+          source: 'demo',
+          artifacts: [
+            {
+              kind: 'metrics',
+              title: 'Souhrn',
+              metrics: [
+                { label: 'Aktivní nemovitosti s mezerami', value: '2' },
+                { label: 'Priorita', value: 'Vysoká', tone: 'warning' },
+              ],
+            },
+            {
+              kind: 'table',
+              title: 'Seznam k doplnění',
+              columns: ['Nemovitost', 'Město', 'Chybějící pole'],
+              rows: [
+                ['Byt 1+kk, Karlín', 'Praha', 'rok poslední rekonstrukce, stavební úpravy, poznámka k rekonstrukci'],
+                ['Komerční prostor, Centrum', 'Praha', 'stav rekonstrukce, rok poslední rekonstrukce, stavební úpravy, poznámka k rekonstrukci'],
+              ],
+            },
+            {
+              kind: 'checklist',
+              title: 'Prioritní checklist',
+              items: [
+                { status: 'critical', label: 'Byt 1+kk, Karlín', detail: 'Doplnit rok poslední rekonstrukce a stavební úpravy.' },
+                { status: 'critical', label: 'Komerční prostor, Centrum', detail: 'Doplnit kompletní blok rekonstrukčních údajů.' },
+              ],
+            },
+          ],
+          nextSteps: [
+            'Doplňte údaje ještě před další prezentací klientům.',
+            'Zvažte kontrolu těchto polí před publikací nové nabídky.',
+          ],
+        },
+      };
+    }
+
+    if ((normalized.includes('report') || normalized.includes('shrn') || normalized.includes('veden')) && (normalized.includes('slide') || normalized.includes('prezentac'))) {
+      return {
+        content: 'Připravil jsem krátký management report a návrh prezentace se třemi slidy.',
+        result: {
+          title: 'Týdenní report pro vedení',
+          summary: 'Stručné obchodní shrnutí s navrženou strukturou pro prezentaci.',
+          source: 'demo',
+          artifacts: [
+            {
+              kind: 'metrics',
+              title: 'Týdenní KPI',
+              metrics: [
+                { label: 'Nové leady', value: '12' },
+                { label: 'Uzavřené prodeje', value: '4', tone: 'positive' },
+                { label: 'Nové listingy', value: '9' },
+              ],
+            },
+            {
+              kind: 'slides',
+              title: 'Návrh 3 slidů',
+              slides: [
+                { title: 'Výkon týdne', bullets: ['12 nových leadů', '4 uzavřené prodeje', 'Stabilní růst poptávky v Praze a Brně'] },
+                { title: 'Trh a pipeline', bullets: ['Rostoucí objem kvalifikovaných leadů', 'Nejlepší konverze mají doporučení a direct web', 'Komerční segment je pomalejší než rezidenční'] },
+                { title: 'Další kroky', bullets: ['Vyčistit chybějící data u top nabídek', 'Posílit follow-up u leadů do 24h', 'Dokončit monitorovací workflow pro klíčové lokality'] },
+              ],
+            },
+          ],
+          nextSteps: [
+            'Doplňte k reportu jména konkrétních transakcí pro vedení.',
+            'Připravte z něj finální prezentaci nebo e-mailový briefing.',
+          ],
+        },
+      };
+    }
+
+    if (normalized.includes('monitor') || normalized.includes('sleduj') || normalized.includes('rano')) {
+      return {
+        content: 'Připravil jsem monitor workflow pro ranní digest nových nabídek.',
+        result: {
+          title: 'Monitoring portálů',
+          summary: 'Denní workflow pro sledování nových nabídek a ranní briefing.',
+          source: 'demo',
+          artifacts: [
+            {
+              kind: 'schedule',
+              title: 'Ranní digest',
+              name: 'Praha Holešovice - nové nabídky',
+              location: 'Praha Holešovice',
+              scheduleLabel: 'Každý den 08:00',
+              sources: ['Sreality', 'Reality.iDNES', 'Flat Zone'],
+              channel: 'Dashboard + e-mail',
+              status: 'Připraveno',
+            },
+          ],
+          nextSteps: [
+            'Doplňte cenové a dispoziční filtry.',
+            'Zapněte finální doručovací kanál pro tým.',
+          ],
+        },
+      };
+    }
+
+    return {
+      content: 'V Auto režimu nyní nejlépe fungují workflow dotazy na klienty, pipeline, e-maily, rekonstrukce, reporty a monitoring.',
+      result: {
+        title: 'Auto Režim',
+        summary: 'Rychlý demo workflow assistant pro back-office scénáře.',
+        source: 'demo',
+        artifacts: [
+          {
+            kind: 'checklist',
+            title: 'Zkuste například',
+            items: [
+              { status: 'info', label: 'Klienti Q1', detail: 'Noví klienti a jejich zdroje.' },
+              { status: 'info', label: 'Leady vs prodeje', detail: 'Graf pipeline za 6 měsíců.' },
+              { status: 'info', label: 'Email + termín', detail: 'Draft e-mailu a termíny prohlídky.' },
+              { status: 'info', label: 'Rekonstrukce', detail: 'Chybějící data u nabídek.' },
+              { status: 'info', label: 'Report + slidy', detail: 'Shrnutí pro vedení.' },
+            ],
+          },
+        ],
+        nextSteps: [
+          'Klikněte na některý z quick promptů pod chatem.',
+          'Pro volnější konverzaci přepněte do OpenRouter nebo OpenClaw.',
+        ],
+      },
+    };
   }
 
   private render(): void {
@@ -704,6 +944,25 @@ export class AIChatPanel extends Panel {
       .replace(/\n/g, '<br>');
   }
 
+  private buildOpenRouterFallbackResponse(text: string, reason: string): { content: string; result: StructuredResult } {
+    const localResponse = this.buildLocalAutoResponse(text);
+    return {
+      content: `OpenRouter na hostované produkci teď nedoběhl včas, proto vracím lokální fallback pro demo.\n\n${localResponse.content}`,
+      result: {
+        ...(localResponse.result || {
+          title: 'OpenRouter Fallback',
+          summary: 'Lokální fallback odpověď pro hostované demo.',
+          source: 'demo',
+          artifacts: [],
+          nextSteps: [],
+        }),
+        title: `${localResponse.result?.title || 'OpenRouter Fallback'} · Fallback`,
+        summary: `Hostovaný OpenRouter backend nedoběhl včas. ${reason}`,
+        source: 'demo',
+      },
+    };
+  }
+
   private async sendMessage(): Promise<void> {
     if (!this.inputEl || this.isStreaming) return;
     const text = this.inputEl.value.trim();
@@ -723,34 +982,100 @@ export class AIChatPanel extends Panel {
     this.renderMessages();
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agentMode: this.agentMode,
-          messages: this.messages.slice(0, -1).map((message) => ({
-            role: message.role,
-            content: message.content,
-          })),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      if (this.agentMode === 'auto') {
+        const localResponse = this.buildLocalAutoResponse(text);
+        this.messages = [
+          ...this.messages.slice(0, -1),
+          {
+            role: 'assistant',
+            content: localResponse.content,
+            result: localResponse.result,
+            timestamp: Date.now(),
+          },
+        ];
+        return;
       }
 
-      const data = await response.json() as { content?: string; result?: StructuredResult };
+      const controller = new AbortController();
+      const timeoutMs = this.agentMode === 'openrouter' ? 9000 : 20000;
+      const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+      let response: Response;
+      try {
+        response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agentMode: this.agentMode,
+            messages: this.messages.slice(0, -1).map((message) => ({
+              role: message.role,
+              content: message.content,
+            })),
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        window.clearTimeout(timer);
+      }
+
+      let data: { content?: string; result?: StructuredResult; error?: string; message?: string } | null = null;
+      try {
+        data = await response.json() as { content?: string; result?: StructuredResult; error?: string; message?: string };
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok) {
+        const detail = data?.message || data?.content || data?.error || `HTTP ${response.status}`;
+        if (this.agentMode === 'openrouter' && (response.status === 504 || response.status === 502 || response.status === 500)) {
+          const fallback = this.buildOpenRouterFallbackResponse(text, `HTTP ${response.status}`);
+          this.messages = [
+            ...this.messages.slice(0, -1),
+            {
+              role: 'assistant',
+              content: fallback.content,
+              result: fallback.result,
+              timestamp: Date.now(),
+            },
+          ];
+          return;
+        }
+        throw new Error(detail);
+      }
+
       this.messages = [
         ...this.messages.slice(0, -1),
         {
           role: 'assistant',
-          content: data.content || 'Výstup je připravený.',
-          result: data.result || null,
+          content: data?.content || 'Výstup je připravený.',
+          result: data?.result || null,
           timestamp: Date.now(),
         },
       ];
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Neznámá chyba';
+      if (this.agentMode === 'openrouter') {
+        const reason = err instanceof DOMException && err.name === 'AbortError'
+          ? 'Timeout hostovaného backendu.'
+          : err instanceof Error
+            ? err.message
+            : 'Neznámá chyba.';
+        const fallback = this.buildOpenRouterFallbackResponse(text, reason);
+        this.messages = [
+          ...this.messages.slice(0, -1),
+          {
+            role: 'assistant',
+            content: fallback.content,
+            result: fallback.result,
+            timestamp: Date.now(),
+          },
+        ];
+        return;
+      }
+
+      const errorMsg = err instanceof DOMException && err.name === 'AbortError'
+        ? 'Požadavek překročil časový limit'
+        : err instanceof Error
+          ? err.message
+          : 'Neznámá chyba';
       this.messages = [
         ...this.messages.slice(0, -1),
         {

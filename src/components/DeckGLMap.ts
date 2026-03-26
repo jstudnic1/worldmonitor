@@ -108,6 +108,16 @@ import type { HappinessData } from '@/services/happiness-data';
 import type { RenewableInstallation } from '@/services/renewable-installations';
 import type { SpeciesRecovery } from '@/services/conservation-data';
 import { getCountriesGeoJson, getCountryAtCoordinates, getCountryBbox } from '@/services/country-geometry';
+import {
+  getRealityPropertySource,
+  subscribeRealityPropertySourceChange,
+} from '@/services/reality-source-settings';
+import {
+  getFocusedRealityProperty,
+  setFocusedRealityProperty,
+  type RealityPropertyFocus,
+  subscribeRealityPropertyFocusChange,
+} from '@/services/reality-property-focus';
 import type { FeatureCollection, Geometry } from 'geojson';
 
 import { isAllowedPreviewUrl } from '@/utils/imagery-preview';
@@ -339,6 +349,9 @@ export class DeckGLMap {
   // Reality variant property markers
   private realityProperties: Array<{ id: string; lat: number; lon: number; title: string; type: string; price: number; city: string; area_m2: number }> = [];
   private realityPropertiesLoaded = false;
+  private unsubscribeRealitySourceChange: (() => void) | null = null;
+  private unsubscribeRealityPropertyFocusChange: (() => void) | null = null;
+  private selectedRealityPropertyId: string | null = getFocusedRealityProperty()?.id ?? null;
 
   // Phase 8 overlay data
   private happinessScores: Map<string, number> = new Map();
@@ -472,6 +485,19 @@ export class DeckGLMap {
     };
     window.addEventListener('map-theme-changed', this.handleMapThemeChange);
 
+    this.unsubscribeRealitySourceChange = subscribeRealityPropertySourceChange(() => {
+      this.realityPropertiesLoaded = false;
+      this.realityProperties = [];
+      if (this.state.layers.realityProperties) {
+        void this.fetchRealityProperties();
+      } else {
+        this.render();
+      }
+    });
+    this.unsubscribeRealityPropertyFocusChange = subscribeRealityPropertyFocusChange((focus) => {
+      this.handleRealityPropertyFocus(focus);
+    });
+
     this.initMapLibre();
 
     this.maplibreMap?.on('load', () => {
@@ -485,7 +511,9 @@ export class DeckGLMap {
     });
 
     this.createControls();
-    this.createTimeSlider();
+    if (SITE_VARIANT !== 'reality') {
+      this.createTimeSlider();
+    }
     this.createLayerToggles();
     this.createLegend();
 
@@ -3749,6 +3777,19 @@ export class DeckGLMap {
 
   // UI Creation methods
   private createControls(): void {
+    const availableViews = SITE_VARIANT === 'reality'
+      ? [{ value: 'czechia', label: t('components.deckgl.views.czechia') }]
+      : [
+        { value: 'global', label: t('components.deckgl.views.global') },
+        { value: 'czechia', label: t('components.deckgl.views.czechia') },
+        { value: 'america', label: t('components.deckgl.views.americas') },
+        { value: 'mena', label: t('components.deckgl.views.mena') },
+        { value: 'eu', label: t('components.deckgl.views.europe') },
+        { value: 'asia', label: t('components.deckgl.views.asia') },
+        { value: 'latam', label: t('components.deckgl.views.latam') },
+        { value: 'africa', label: t('components.deckgl.views.africa') },
+        { value: 'oceania', label: t('components.deckgl.views.oceania') },
+      ];
     const controls = document.createElement('div');
     controls.className = 'map-controls deckgl-controls';
     controls.innerHTML = `
@@ -3759,15 +3800,7 @@ export class DeckGLMap {
       </div>
       <div class="view-selector">
         <select class="view-select">
-          <option value="global">${t('components.deckgl.views.global')}</option>
-          <option value="czechia">${t('components.deckgl.views.czechia')}</option>
-          <option value="america">${t('components.deckgl.views.americas')}</option>
-          <option value="mena">${t('components.deckgl.views.mena')}</option>
-          <option value="eu">${t('components.deckgl.views.europe')}</option>
-          <option value="asia">${t('components.deckgl.views.asia')}</option>
-          <option value="latam">${t('components.deckgl.views.latam')}</option>
-          <option value="africa">${t('components.deckgl.views.africa')}</option>
-          <option value="oceania">${t('components.deckgl.views.oceania')}</option>
+          ${availableViews.map((view) => `<option value="${view.value}">${view.label}</option>`).join('')}
         </select>
       </div>
     `;
@@ -3825,6 +3858,7 @@ export class DeckGLMap {
   private createLayerToggles(): void {
     const toggles = document.createElement('div');
     toggles.className = 'layer-toggles deckgl-layer-toggles';
+    const isRealityVariant = SITE_VARIANT === 'reality';
 
     const layerDefs = getLayersForVariant((SITE_VARIANT || 'full') as MapVariant, 'flat');
     const _wmKey = getSecretState('WORLDMONITOR_API_KEY').present;
@@ -3838,10 +3872,10 @@ export class DeckGLMap {
     toggles.innerHTML = `
       <div class="toggle-header">
         <span>${t('components.deckgl.layersTitle')}</span>
-        <button class="layer-help-btn" title="${t('components.deckgl.layerGuide')}">?</button>
+        ${isRealityVariant ? '' : `<button class="layer-help-btn" title="${t('components.deckgl.layerGuide')}">?</button>`}
         <button class="toggle-collapse">&#9660;</button>
       </div>
-      <input type="text" class="layer-search" placeholder="${t('components.deckgl.layerSearch')}" autocomplete="off" spellcheck="false" />
+      ${isRealityVariant ? '' : `<input type="text" class="layer-search" placeholder="${t('components.deckgl.layerSearch')}" autocomplete="off" spellcheck="false" />`}
       <div class="toggle-list" style="max-height: 32vh; overflow-y: auto; scrollbar-width: thin;">
         ${layerConfig.map(({ key, label, icon, premium }) => {
           const isLocked = premium === 'locked' && !_wmKey;
@@ -3855,11 +3889,6 @@ export class DeckGLMap {
         }).join('')}
       </div>
     `;
-
-    const authorBadge = document.createElement('div');
-    authorBadge.className = 'map-author-badge';
-    authorBadge.textContent = '© Elie Habib · Someone™';
-    toggles.appendChild(authorBadge);
 
     this.container.appendChild(toggles);
 
@@ -3899,7 +3928,9 @@ export class DeckGLMap {
       }, { passive: false });
       toggles.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
     }
-    bindLayerSearch(toggles);
+    if (!isRealityVariant) {
+      bindLayerSearch(toggles);
+    }
     const searchEl = toggles.querySelector('.layer-search') as HTMLElement | null;
 
     collapseBtn?.addEventListener('click', () => {
@@ -4099,7 +4130,7 @@ export class DeckGLMap {
           { shape: shapes.square('rgb(255, 150, 80)'), label: t('components.deckgl.legend.commodityHub') },
           { shape: shapes.triangle('rgb(80, 170, 255)'), label: t('components.deckgl.legend.waterway') },
         ]
-        : SITE_VARIANT === 'happy'
+      : SITE_VARIANT === 'happy'
           ? [
             { shape: shapes.circle('rgb(34, 197, 94)'), label: 'Positive Event' },
             { shape: shapes.circle('rgb(234, 179, 8)'), label: 'Breakthrough' },
@@ -4110,6 +4141,13 @@ export class DeckGLMap {
             { shape: shapes.circle('rgb(255, 200, 50)'), label: 'Renewable Installation' },
             { shape: shapes.circle('rgb(160, 100, 255)'), label: t('components.deckgl.legend.aircraft') },
           ]
+          : SITE_VARIANT === 'reality'
+            ? [
+              { shape: shapes.circle('rgb(68, 255, 136)'), label: t('components.deckgl.legend.apartment') },
+              { shape: shapes.circle('rgb(68, 136, 255)'), label: t('components.deckgl.legend.house') },
+              { shape: shapes.circle('rgb(255, 170, 68)'), label: t('components.deckgl.legend.land') },
+              { shape: shapes.circle('rgb(255, 68, 136)'), label: t('components.deckgl.legend.commercial') },
+            ]
           : [
             { shape: shapes.circle('rgb(255, 68, 68)'), label: t('components.deckgl.legend.highAlert') },
             { shape: shapes.circle('rgb(255, 165, 0)'), label: t('components.deckgl.legend.elevated') },
@@ -4126,20 +4164,22 @@ export class DeckGLMap {
     `;
 
     // CII choropleth gradient legend (shown when layer is active)
-    const ciiLegend = document.createElement('div');
-    ciiLegend.className = 'cii-choropleth-legend';
-    ciiLegend.id = 'ciiChoroplethLegend';
-    ciiLegend.style.display = this.state.layers.ciiChoropleth ? 'block' : 'none';
-    ciiLegend.innerHTML = `
-      <span class="legend-label-title" style="font-size:9px;letter-spacing:0.5px;">CII SCALE</span>
-      <div style="display:flex;align-items:center;gap:2px;margin-top:2px;">
-        <div style="width:100%;height:8px;border-radius:3px;background:linear-gradient(to right,#28b33e,#dcc030,#e87425,#dc2626,#7f1d1d);"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:8px;opacity:0.7;margin-top:1px;">
-        <span>0</span><span>31</span><span>51</span><span>66</span><span>81</span><span>100</span>
-      </div>
-    `;
-    legend.appendChild(ciiLegend);
+    if (SITE_VARIANT !== 'reality') {
+      const ciiLegend = document.createElement('div');
+      ciiLegend.className = 'cii-choropleth-legend';
+      ciiLegend.id = 'ciiChoroplethLegend';
+      ciiLegend.style.display = this.state.layers.ciiChoropleth ? 'block' : 'none';
+      ciiLegend.innerHTML = `
+        <span class="legend-label-title" style="font-size:9px;letter-spacing:0.5px;">CII SCALE</span>
+        <div style="display:flex;align-items:center;gap:2px;margin-top:2px;">
+          <div style="width:100%;height:8px;border-radius:3px;background:linear-gradient(to right,#28b33e,#dcc030,#e87425,#dc2626,#7f1d1d);"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:8px;opacity:0.7;margin-top:1px;">
+          <span>0</span><span>31</span><span>51</span><span>66</span><span>81</span><span>100</span>
+        </div>
+      `;
+      legend.appendChild(ciiLegend);
+    }
 
     this.container.appendChild(legend);
   }
@@ -4760,7 +4800,14 @@ export class DeckGLMap {
     if (this.realityPropertiesLoaded) return;
     this.realityPropertiesLoaded = true;
     try {
-      const res = await fetch('/api/properties?limit=1500&status=aktivn%C3%AD');
+      const params = new URLSearchParams({
+        limit: '1500',
+        status: 'aktivní',
+      });
+      const source = getRealityPropertySource();
+      if (source !== 'all') params.set('source', source);
+
+      const res = await fetch(`/api/properties?${params.toString()}`);
       if (!res.ok) return;
       const data = await res.json() as { properties: Array<{ id: string; lat: number; lon: number; title: string; type: string; price: number; city: string; area_m2: number }> };
       this.realityProperties = (data.properties || []).filter(p => p.lat && p.lon);
@@ -4779,20 +4826,73 @@ export class DeckGLMap {
       id: 'reality-properties-layer',
       data: this.realityProperties,
       getPosition: (d: { lon: number; lat: number }) => [d.lon, d.lat],
-      getRadius: 200,
+      getRadius: (d: { id: string }) => d.id === this.selectedRealityPropertyId ? 320 : 200,
       radiusMinPixels: 3,
-      radiusMaxPixels: 12,
+      radiusMaxPixels: 14,
       getFillColor: (d: { type: string }) => TYPE_COLORS[d.type] ?? [180, 180, 180, 180],
+      getLineColor: (d: { id: string }) => d.id === this.selectedRealityPropertyId ? [255, 255, 255, 230] : [255, 255, 255, 0],
+      getLineWidth: (d: { id: string }) => d.id === this.selectedRealityPropertyId ? 3 : 0,
+      stroked: true,
       pickable: true,
       autoHighlight: true,
       highlightColor: [255, 255, 255, 120],
       onClick: (info: PickingInfo) => {
         if (!info.object) return;
-        const p = info.object as { title: string; type: string; price: number; city: string; area_m2: number };
+        const p = info.object as { id: string; lat: number; lon: number; title: string; type: string; price: number; city: string; area_m2: number };
+        setFocusedRealityProperty({
+          id: p.id,
+          title: p.title,
+          lat: p.lat,
+          lon: p.lon,
+        });
         this.popup.show({ type: 'realityProperty', data: p, x: info.x, y: info.y });
       },
-      updateTriggers: { getPosition: this.realityProperties.length, getFillColor: this.realityProperties.length },
+      updateTriggers: {
+        getPosition: this.realityProperties.length,
+        getFillColor: this.realityProperties.length,
+        getRadius: this.selectedRealityPropertyId,
+        getLineColor: this.selectedRealityPropertyId,
+        getLineWidth: this.selectedRealityPropertyId,
+      },
     });
+  }
+
+  private handleRealityPropertyFocus(focus: RealityPropertyFocus | null): void {
+    this.selectedRealityPropertyId = focus?.id ?? null;
+    if (!focus) {
+      this.render();
+      return;
+    }
+
+    this.enableLayer('realityProperties');
+
+    const focusedProperty = this.realityProperties.find((property) => property.id === focus.id);
+    const lat = focus.lat ?? focusedProperty?.lat;
+    const lon = focus.lon ?? focusedProperty?.lon;
+
+    if (lat != null && lon != null) {
+      const focusZoom = Math.max(this.maplibreMap?.getZoom() ?? 0, 13.4);
+      this.setCenter(lat, lon, focusZoom);
+      this.flashLocation(lat, lon, 1800);
+
+      const point = this.maplibreMap?.project([lon, lat]);
+      if (point) {
+        this.popup.show({
+          type: 'realityProperty',
+          data: {
+            title: focusedProperty?.title || focus.title || 'Nemovitost',
+            type: focusedProperty?.type || 'nemovitost',
+            price: focusedProperty?.price || 0,
+            city: focusedProperty?.city || '',
+            area_m2: focusedProperty?.area_m2 || 0,
+          },
+          x: point.x,
+          y: point.y,
+        });
+      }
+    }
+
+    this.render();
   }
 
   public updateHotspotActivity(news: NewsItem[]): void {
@@ -5417,6 +5517,10 @@ export class DeckGLMap {
   }
 
   public destroy(): void {
+    this.unsubscribeRealitySourceChange?.();
+    this.unsubscribeRealitySourceChange = null;
+    this.unsubscribeRealityPropertyFocusChange?.();
+    this.unsubscribeRealityPropertyFocusChange = null;
     window.removeEventListener('theme-changed', this.handleThemeChange);
     window.removeEventListener('map-theme-changed', this.handleMapThemeChange);
     this.debouncedRebuildLayers.cancel();

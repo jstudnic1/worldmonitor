@@ -27,6 +27,7 @@ export const FEEDS: Record<string, Feed[]> = {
     { name: 'Sreality', url: rss('https://news.google.com/rss/search?q=site:sreality.cz+OR+"sreality"+when:7d&hl=cs&gl=CZ&ceid=CZ:cs'), lang: 'cs' },
     { name: 'Bezrealitky', url: rss('https://news.google.com/rss/search?q=site:bezrealitky.cz+OR+"bezrealitky"+when:7d&hl=cs&gl=CZ&ceid=CZ:cs'), lang: 'cs' },
     { name: 'Reality iDNES', url: rss('https://news.google.com/rss/search?q=site:reality.idnes.cz+when:7d&hl=cs&gl=CZ&ceid=CZ:cs'), lang: 'cs' },
+    { name: 'Flat Zone', url: rss('https://news.google.com/rss/search?q=site:flatzone.cz+OR+"Flat+Zone"+OR+"novostavby"+when:7d&hl=cs&gl=CZ&ceid=CZ:cs'), lang: 'cs' },
     { name: 'Realitni zpravy', url: rss('https://news.google.com/rss/search?q="realitní+trh"+OR+"nemovitosti"+OR+"byty"+when:3d&hl=cs&gl=CZ&ceid=CZ:cs'), lang: 'cs' },
   ],
   'market-analysis': [

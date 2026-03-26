@@ -29,6 +29,7 @@ const SETTINGS_KEY_PREFIXES = [
   'wm-globe-render-scale',
   'wm-live-streams-always-on',
   'wm-font-family',
+  'wm-reality-property-source',
   'wm-map-theme:',
   'map-height',
   'map-pinned',

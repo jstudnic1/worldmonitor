@@ -1,14 +1,27 @@
+import { request as requestHttp } from 'node:http';
+import { request as requestHttps } from 'node:https';
 import { getCorsHeaders } from './_cors.js';
 import { insertRows, isConfigured, queryTable } from './_supabase.js';
 import {
   buildOpenClawPreviewResponse,
   formatOpenClawToolLabel,
   isOpenClawConfigured,
-  resolveAgentMode,
   runOpenClawConversation,
 } from './_openclaw.js';
+import { DEFAULT_MONITOR_SOURCES, formatPortalLabel } from './_portal-sources.js';
+import { fetchRealityMarketStats } from './_market-stats.js';
 
-export const config = { runtime: 'nodejs', maxDuration: 30 };
+export const config = { runtime: 'nodejs', maxDuration: 60 };
+
+const CHAT_DATA_TIMEOUT_MS = Math.max(1500, Number(process.env.CHAT_DATA_TIMEOUT_MS) || 8000);
+const CHAT_WRITE_TIMEOUT_MS = Math.max(1000, Number(process.env.CHAT_WRITE_TIMEOUT_MS) || 4000);
+const CHAT_FORCE_DEMO_MODE = process.env.CHAT_FORCE_DEMO_MODE === '1'
+  || process.env.VERCEL_ENV === 'production';
+const OPENROUTER_TIMEOUT_MS = Math.max(4000, Number(process.env.OPENROUTER_TIMEOUT_MS) || 8000);
+const OPENROUTER_MODEL = String(process.env.OPENROUTER_MODEL || 'openai/gpt-4.1-mini');
+const CHAT_UPSTREAM_URL = String(process.env.REALITY_CHAT_UPSTREAM_URL || '').replace(/\/+$/, '');
+const CHAT_UPSTREAM_KEY = String(process.env.REALITY_CHAT_UPSTREAM_KEY || '').trim();
+const CHAT_UPSTREAM_TIMEOUT_MS = Math.max(3000, Number(process.env.REALITY_CHAT_UPSTREAM_TIMEOUT_MS) || 15000);
 
 const SYSTEM_PROMPT = `Jsi AI back-office agent pro českou realitní kancelář "Reality Monitor". Komunikuješ výhradně česky.
 
@@ -393,6 +406,75 @@ const TOOLS = [
   },
 ];
 
+function readHeader(req, name) {
+  if (!req?.headers) return '';
+
+  if (typeof req.headers.get === 'function') {
+    return req.headers.get(name) || '';
+  }
+
+  const lowerName = String(name || '').toLowerCase();
+  const value = req.headers[lowerName] ?? req.headers[name] ?? req.headers[String(name || '').toUpperCase()];
+  if (Array.isArray(value)) return value[0] || '';
+  return typeof value === 'string' ? value : '';
+}
+
+function shouldProxyChatRequest(req) {
+  if (!CHAT_UPSTREAM_URL) return false;
+  return readHeader(req, 'x-reality-chat-proxy') !== '1';
+}
+
+function forwardChatToUpstream(rawBody, req, cors) {
+  return new Promise((resolve, reject) => {
+    const target = new URL('/api/chat', `${CHAT_UPSTREAM_URL}/`);
+    const requestImpl = target.protocol === 'http:' ? requestHttp : requestHttps;
+    const headers = {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(rawBody || ''),
+      'x-reality-chat-proxy': '1',
+    };
+
+    const authHeader = readHeader(req, 'authorization');
+    const forwardedFor = readHeader(req, 'x-forwarded-for');
+    const origin = readHeader(req, 'origin');
+    if (authHeader) headers.Authorization = authHeader;
+    if (forwardedFor) headers['x-forwarded-for'] = forwardedFor;
+    if (origin) headers.Origin = origin;
+    if (CHAT_UPSTREAM_KEY) headers['x-worldmonitor-key'] = CHAT_UPSTREAM_KEY;
+
+    const upstreamReq = requestImpl({
+      protocol: target.protocol,
+      hostname: target.hostname,
+      port: target.port || undefined,
+      path: `${target.pathname}${target.search}`,
+      method: 'POST',
+      headers,
+    }, (upstreamRes) => {
+      let text = '';
+      upstreamRes.setEncoding('utf8');
+      upstreamRes.on('data', (chunk) => {
+        text += chunk;
+      });
+      upstreamRes.on('end', () => {
+        const responseHeaders = { ...cors, 'Content-Type': upstreamRes.headers['content-type'] || 'application/json' };
+        resolve(new Response(text, {
+          status: Number(upstreamRes.statusCode || 502),
+          headers: responseHeaders,
+        }));
+      });
+    });
+
+    upstreamReq.setTimeout(CHAT_UPSTREAM_TIMEOUT_MS, () => {
+      upstreamReq.destroy(new Error(`Chat upstream timeout after ${CHAT_UPSTREAM_TIMEOUT_MS}ms`));
+    });
+    upstreamReq.on('error', (error) => {
+      reject(error);
+    });
+    upstreamReq.write(rawBody || '');
+    upstreamReq.end();
+  });
+}
+
 const ARTIFACT_TOOL_NAMES = new Set([
   'create_chart', 'create_table', 'create_metrics',
   'create_email_draft', 'create_slides', 'create_checklist',
@@ -611,7 +693,6 @@ const DEMO_ALERTS = [
   { id: 'alert-3', type: 'portal_update', title: 'Konkurenční nabídky v Holešovicích', description: 'Na hlavních portálech přibylo 8 nových inzerátů.', severity: 'low', read: true, created_at: '2026-03-21T16:00:00.000Z' },
 ];
 
-const DEFAULT_MONITOR_SOURCES = ['sreality', 'bezrealitky', 'reality_idnes'];
 const MAX_TOOL_ROUNDS = 5;
 
 function getErrorMessage(err) {
@@ -677,8 +758,9 @@ function formatSourceLabel(value) {
     sreality: 'Sreality',
     bezrealitky: 'Bezrealitky',
     reality_idnes: 'Reality.iDNES',
+    flatzone: 'Flat Zone',
   };
-  return labels[normalized] || (value ? String(value) : 'Neznámý zdroj');
+  return labels[normalized] || formatPortalLabel(value);
 }
 
 function getCombinedSource(sources) {
@@ -689,11 +771,11 @@ function getCombinedSource(sources) {
 }
 
 async function fetchTableOrDemo(table, query, fallbackRows) {
-  if (!isConfigured()) {
+  if (CHAT_FORCE_DEMO_MODE || !isConfigured()) {
     return { rows: fallbackRows, source: 'demo' };
   }
   try {
-    const rows = await queryTable(table, query);
+    const rows = await queryTable(table, query, { timeoutMs: CHAT_DATA_TIMEOUT_MS });
     return { rows, source: 'supabase' };
   } catch {
     return { rows: fallbackRows, source: 'demo' };
@@ -758,6 +840,73 @@ function findLastUserPrompt(messages) {
   return '';
 }
 
+function shouldUseLlmTools(prompt) {
+  const normalized = normalizeText(prompt);
+  return [
+    'nemovit',
+    'klient',
+    'lead',
+    'prohlid',
+    'kalendar',
+    'email',
+    'e-mail',
+    'upozornen',
+    'alert',
+    'report',
+    'slide',
+    'prezentac',
+    'graf',
+    'tabulk',
+    'monitor',
+    'rekonstruk',
+    'prodej',
+    'statistik',
+  ].some((token) => normalized.includes(token));
+}
+
+async function fetchOpenRouterWithTimeout(apiKey, payload) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify(payload);
+    const req = requestHttps('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+        'HTTP-Referer': 'https://reality.worldmonitor.app',
+        'X-Title': 'Reality Monitor AI',
+      },
+    }, (response) => {
+      let text = '';
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => {
+        text += chunk;
+      });
+      response.on('end', () => {
+        resolve({
+          ok: Number(response.statusCode || 0) >= 200 && Number(response.statusCode || 0) < 300,
+          status: Number(response.statusCode || 0),
+          text: async () => text,
+          json: async () => {
+            try {
+              return text ? JSON.parse(text) : {};
+            } catch {
+              return {};
+            }
+          },
+        });
+      });
+    });
+
+    req.setTimeout(OPENROUTER_TIMEOUT_MS, () => {
+      req.destroy(new Error(`OpenRouter request timeout after ${OPENROUTER_TIMEOUT_MS}ms`));
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
 function detectStructuredIntent(prompt) {
   const normalized = normalizeText(prompt);
   if ((normalized.includes('nove klient') || normalized.includes('nove klienty')) && (normalized.includes('kvartal') || /\bq[1-4]\b/.test(normalized))) {
@@ -796,9 +945,11 @@ function buildArtifactRef(kind, title, id) {
 }
 
 async function persistArtifact(kind, title, payload) {
-  if (!isConfigured()) return null;
+  if (CHAT_FORCE_DEMO_MODE || !isConfigured()) return null;
   try {
-    const inserted = await insertRows('generated_artifacts', { kind, title, payload });
+    const inserted = await insertRows('generated_artifacts', { kind, title, payload }, {
+      timeoutMs: CHAT_WRITE_TIMEOUT_MS,
+    });
     return inserted?.[0]?.id || null;
   } catch {
     return null;
@@ -806,9 +957,11 @@ async function persistArtifact(kind, title, payload) {
 }
 
 async function persistTasks(tasks) {
-  if (!isConfigured() || tasks.length === 0) return 0;
+  if (CHAT_FORCE_DEMO_MODE || !isConfigured() || tasks.length === 0) return 0;
   try {
-    const inserted = await insertRows('operations_tasks', tasks);
+    const inserted = await insertRows('operations_tasks', tasks, {
+      timeoutMs: CHAT_WRITE_TIMEOUT_MS,
+    });
     return inserted?.length || 0;
   } catch {
     return 0;
@@ -816,9 +969,11 @@ async function persistTasks(tasks) {
 }
 
 async function persistMonitor(configRow) {
-  if (!isConfigured()) return null;
+  if (CHAT_FORCE_DEMO_MODE || !isConfigured()) return null;
   try {
-    const inserted = await insertRows('saved_monitors', configRow);
+    const inserted = await insertRows('saved_monitors', configRow, {
+      timeoutMs: CHAT_WRITE_TIMEOUT_MS,
+    });
     return inserted?.[0] || null;
   } catch {
     return null;
@@ -1029,8 +1184,10 @@ async function buildClientIntakeResult(prompt) {
 
 async function buildPipelineTrendResult(prompt) {
   const months = extractMonthCount(prompt, 6);
-  const leadsRes = await fetchTableOrDemo('leads', 'select=*&order=created_at.desc&limit=500', DEMO_LEADS);
-  const salesRes = await fetchTableOrDemo('sales', 'select=*&order=closed_at.desc&limit=500', DEMO_SALES);
+  const [leadsRes, salesRes] = await Promise.all([
+    fetchTableOrDemo('leads', 'select=id,created_at,status,source&order=created_at.desc&limit=500', DEMO_LEADS),
+    fetchTableOrDemo('sales', 'select=id,created_at,closed_at,contract_signed_at,sale_price&order=closed_at.desc&limit=500', DEMO_SALES),
+  ]);
   const buckets = buildMonthBuckets(months);
 
   const leadValues = buckets.map((bucket) => leadsRes.rows.filter((lead) => {
@@ -1099,9 +1256,11 @@ async function buildPipelineTrendResult(prompt) {
 }
 
 async function buildEmailDraftResult(prompt) {
-  const propertiesRes = await fetchTableOrDemo('properties', 'select=*&order=listed_at.desc&limit=100', DEMO_PROPERTIES);
-  const clientsRes = await fetchTableOrDemo('clients', 'select=*&order=created_at.desc&limit=100', DEMO_CLIENTS);
-  const calendarRes = await fetchTableOrDemo('calendar_events', 'select=*&order=start_at.asc&limit=100', DEMO_CALENDAR_EVENTS);
+  const [propertiesRes, clientsRes, calendarRes] = await Promise.all([
+    fetchTableOrDemo('properties', 'select=id,title,city,address,price,status,type,area_m2&order=listed_at.desc&limit=100', DEMO_PROPERTIES),
+    fetchTableOrDemo('clients', 'select=id,name,email,phone,created_at,source,source_details&order=created_at.desc&limit=100', DEMO_CLIENTS),
+    fetchTableOrDemo('calendar_events', 'select=id,title,start_at,end_at,status,type,location&order=start_at.asc&limit=100', DEMO_CALENDAR_EVENTS),
+  ]);
   const property = findMatchingProperty(prompt, propertiesRes.rows);
   const client = findMatchingClient(prompt, clientsRes.rows);
   const suggestedSlots = findAvailableSlots(calendarRes.rows, 3);
@@ -1162,7 +1321,11 @@ Reality Monitor`;
 }
 
 async function buildRenovationGapResult() {
-  const propertiesRes = await fetchTableOrDemo('properties', 'select=*&order=listed_at.desc&limit=200', DEMO_PROPERTIES);
+  const propertiesRes = await fetchTableOrDemo(
+    'properties',
+    'select=id,title,city,status,renovation_status,last_reconstruction_year,building_modifications,reconstruction_notes&order=listed_at.desc&limit=160',
+    DEMO_PROPERTIES,
+  );
   const activeProperties = propertiesRes.rows.filter((property) => normalizeText(property.status) === 'aktivni');
   const rows = activeProperties.map((property) => {
     const missing = [];
@@ -1228,11 +1391,13 @@ async function buildRenovationGapResult() {
 }
 
 async function buildWeeklyReportResult() {
-  const leadsRes = await fetchTableOrDemo('leads', 'select=*&order=created_at.desc&limit=500', DEMO_LEADS);
-  const salesRes = await fetchTableOrDemo('sales', 'select=*&order=closed_at.desc&limit=500', DEMO_SALES);
-  const alertsRes = await fetchTableOrDemo('alerts', 'select=*&order=created_at.desc&limit=200', DEMO_ALERTS);
-  const calendarRes = await fetchTableOrDemo('calendar_events', 'select=*&order=start_at.desc&limit=200', DEMO_CALENDAR_EVENTS);
-  const propertiesRes = await fetchTableOrDemo('properties', 'select=*&order=listed_at.desc&limit=200', DEMO_PROPERTIES);
+  const [leadsRes, salesRes, alertsRes, calendarRes, propertiesRes] = await Promise.all([
+    fetchTableOrDemo('leads', 'select=id,created_at,status,source&order=created_at.desc&limit=500', DEMO_LEADS),
+    fetchTableOrDemo('sales', 'select=id,created_at,closed_at,contract_signed_at,sale_price&order=closed_at.desc&limit=500', DEMO_SALES),
+    fetchTableOrDemo('alerts', 'select=id,created_at,type,title,severity&order=created_at.desc&limit=200', DEMO_ALERTS),
+    fetchTableOrDemo('calendar_events', 'select=id,title,start_at,end_at,status,type&order=start_at.desc&limit=200', DEMO_CALENDAR_EVENTS),
+    fetchTableOrDemo('properties', 'select=id,title,city,listed_at,status,price,type&order=listed_at.desc&limit=200', DEMO_PROPERTIES),
+  ]);
 
   const rangeEnd = new Date();
   const rangeStart = new Date(rangeEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -1447,32 +1612,11 @@ async function executeTool(name, args) {
     }
 
     case 'get_market_stats': {
-      const parts = ['select=city,type,price,price_per_m2,area_m2,status'];
-      if (args.city) parts.push(`city=ilike.*${args.city}*`);
-      if (args.type) parts.push(`type=eq.${args.type}`);
-      const properties = await queryTable('properties', parts.join('&'));
-
-      const byCity = {};
-      for (const property of properties) {
-        const key = property.city || 'Neznámé';
-        if (!byCity[key]) byCity[key] = { count: 0, totalPrice: 0, totalPriceM2: 0, countM2: 0, totalArea: 0 };
-        byCity[key].count += 1;
-        byCity[key].totalPrice += Number(property.price) || 0;
-        if (property.price_per_m2) {
-          byCity[key].totalPriceM2 += Number(property.price_per_m2);
-          byCity[key].countM2 += 1;
-        }
-        byCity[key].totalArea += Number(property.area_m2) || 0;
-      }
-
-      const stats = Object.entries(byCity).map(([city, entry]) => ({
-        city,
-        count: entry.count,
-        avg_price: Math.round(entry.totalPrice / entry.count),
-        avg_price_per_m2: entry.countM2 > 0 ? Math.round(entry.totalPriceM2 / entry.countM2) : null,
-        avg_area_m2: Math.round(entry.totalArea / entry.count),
-      }));
-      return { total_properties: properties.length, stats_by_city: stats };
+      return fetchRealityMarketStats({
+        city: args.city || '',
+        source: args.source || '',
+        type: args.type || 'byt',
+      });
     }
 
     case 'search_clients': {
@@ -1666,16 +1810,87 @@ export default async function handler(req) {
   }
 
   try {
-    const body = await req.json();
+    const rawBody = await req.text();
+    if (shouldProxyChatRequest(req)) {
+      try {
+        return await forwardChatToUpstream(rawBody, req, cors);
+      } catch (err) {
+        return new Response(JSON.stringify({
+          error: 'Chat upstream unavailable',
+          message: getErrorMessage(err),
+        }), {
+          status: 502,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    const body = rawBody ? JSON.parse(rawBody) : {};
     const userMessages = Array.isArray(body.messages) ? body.messages : [];
     const latestPrompt = findLastUserPrompt(userMessages);
-    const agentMode = resolveAgentMode(body.agentMode);
-    const structuredResponse = latestPrompt && agentMode !== 'openclaw'
-      ? await maybeHandleStructuredWorkflow(latestPrompt)
-      : null;
+    const requestedMode = typeof body.agentMode === 'string' ? body.agentMode.trim().toLowerCase() : 'auto';
+    const agentMode = requestedMode === 'openclaw'
+      ? 'openclaw'
+      : requestedMode === 'openrouter'
+        ? 'openrouter'
+        : 'auto';
+    let structuredResponse = null;
+    if (latestPrompt && agentMode !== 'openclaw') {
+      try {
+        structuredResponse = await maybeHandleStructuredWorkflow(latestPrompt);
+      } catch (err) {
+        return new Response(JSON.stringify({
+          content: `Specializovaný workflow pro tento dotaz selhal: ${getErrorMessage(err)}. Přepněte dotaz znovu nebo použijte režim OpenClaw/OpenRouter.`,
+          result: {
+            title: 'Workflow Error',
+            summary: 'Předpřipravený workflow pro back-office dotaz spadl na interní chybě, ale chat zůstal dostupný.',
+            source: 'workflow-fallback',
+            artifacts: [],
+            nextSteps: [
+              'Zkuste dotaz poslat znovu po refreshi stránky.',
+              'Pokud problém přetrvá, přepněte do režimu OpenClaw nebo OpenRouter.',
+            ],
+          },
+        }), {
+          status: 200,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
     if (structuredResponse) {
       return new Response(JSON.stringify(structuredResponse), {
+        status: 200,
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (agentMode === 'auto') {
+      return new Response(JSON.stringify({
+        content: 'V režimu Auto nyní obsluhuji hlavně předpřipravené back-office workflow dotazy. Použijte některý z quick promptů níže, nebo explicitně přepněte do režimu OpenRouter / OpenClaw.',
+        result: {
+          title: 'Auto Režim',
+          summary: 'Auto režim je optimalizovaný na rychlé workflow pro prezentaci a běžnou back-office práci.',
+          source: CHAT_FORCE_DEMO_MODE ? 'demo' : 'workflow-handoff',
+          artifacts: [
+            {
+              kind: 'checklist',
+              title: 'Doporučené dotazy',
+              items: [
+                { status: 'info', label: 'Klienti Q1', detail: 'Zdroj a příliv nových klientů.' },
+                { status: 'info', label: 'Leady vs prodeje', detail: 'Vývoj pipeline za poslední měsíce.' },
+                { status: 'info', label: 'Email + termín', detail: 'Návrh e-mailu a sloty z kalendáře.' },
+                { status: 'info', label: 'Rekonstrukce', detail: 'Nemovitosti s chybějícími daty.' },
+                { status: 'info', label: 'Report + slidy', detail: 'Týdenní shrnutí pro vedení.' },
+              ],
+            },
+          ],
+          nextSteps: [
+            'Klikněte na některý z připravených quick promptů pod inputem.',
+            'Pokud chcete volnější konverzaci, přepněte do režimu OpenRouter.',
+          ],
+        },
+      }), {
         status: 200,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -1743,27 +1958,40 @@ export default async function handler(req) {
       { role: 'system', content: SYSTEM_PROMPT },
       ...userMessages,
     ];
+    const useTools = shouldUseLlmTools(latestPrompt);
 
     // Accumulate artifacts from create_chart / create_table / etc.
     const collectedArtifacts = [];
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://reality.worldmonitor.app',
-          'X-Title': 'Reality Monitor AI',
-        },
-        body: JSON.stringify({
-          model: 'anthropic/claude-sonnet-4',
+      let response;
+      try {
+        response = await fetchOpenRouterWithTimeout(apiKey, {
+          model: OPENROUTER_MODEL,
           messages,
-          tools: TOOLS,
-          max_tokens: 4096,
+          tools: useTools ? TOOLS : undefined,
+          max_tokens: useTools ? 1200 : 300,
           temperature: 0.3,
-        }),
-      });
+        });
+      } catch (err) {
+        const errorMessage = getErrorMessage(err);
+        return new Response(JSON.stringify({
+          content: `OpenRouter nestihl odpovědět v časovém limitu (${Math.round(OPENROUTER_TIMEOUT_MS / 1000)} s). Pro rychlé demo použijte režim Auto.`,
+          result: {
+            title: 'OpenRouter Timeout',
+            summary: 'Hostovaná odpověď modelu byla pomalejší než povolený limit requestu.',
+            source: 'openrouter-timeout',
+            artifacts: [],
+            nextSteps: [
+              'Pro spolehlivé demo použijte režim Auto.',
+              `Technický detail: ${errorMessage}`,
+            ],
+          },
+        }), {
+          status: 200,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1861,7 +2089,21 @@ export default async function handler(req) {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: 'Internal server error', message: getErrorMessage(err) }), {
+    return new Response(JSON.stringify({
+      content: `Došlo k interní chybě chatu: ${getErrorMessage(err)}.`,
+      result: {
+        title: 'Chat Error',
+        summary: 'Chat narazil na neočekávanou chybu. Zkuste refresh nebo jiný režim agenta.',
+        source: 'chat-error',
+        artifacts: [],
+        nextSteps: [
+          'Obnovte stránku a zkuste dotaz poslat znovu.',
+          'Pokud používáte OpenClaw, ověřte dostupnost runtime nebo přepněte na Auto.',
+        ],
+      },
+      error: 'Internal server error',
+      message: getErrorMessage(err),
+    }), {
       status: 500,
       headers: { ...cors, 'Content-Type': 'application/json' },
     });

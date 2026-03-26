@@ -207,6 +207,9 @@
     "panelCatDeals": "Deals & Institutional",
     "panelCatGulfMena": "Gulf & MENA",
     "panelCatTradePolicy": "Trade Policy",
+    "panelCatRealityCore": "Dashboard Core",
+    "panelCatRealityIntelligence": "Market & News",
+    "panelCatRealityOperations": "Back Office",
     "panelCatCommodityPrices": "Prices & Markets",
     "panelCatMining": "Mining & Supply Chain",
     "panelCatCommodityEcon": "Economy & Trade",
@@ -1096,6 +1099,10 @@
         "centralBank": "Central Bank",
         "commodityHub": "Commodity Hub",
         "waterway": "Waterway",
+        "apartment": "Apartments",
+        "house": "Houses",
+        "land": "Land",
+        "commercial": "Commercial",
         "highAlert": "High Alert",
         "elevated": "Elevated",
         "monitoring": "Monitoring",
@@ -1172,7 +1179,8 @@
         "kindness": "Acts of Kindness",
         "happiness": "World Happiness",
         "speciesRecovery": "Species Recovery",
-        "renewableInstallations": "Clean Energy"
+        "renewableInstallations": "Clean Energy",
+        "realityProperties": "Properties"
       },
       "tooltip": {
         "earthquake": "Earthquake",
@@ -2503,6 +2511,7 @@
     "intelligence": "Intelligence",
     "media": "Media",
     "panels": "Panels",
+    "data": "Data",
     "dataAndCommunity": "Data & Community",
     "theme": "Theme",
     "themeDesc": "Auto follows your system preference.",

@@ -195,6 +195,8 @@ export class UnifiedSettings {
   private render(): void {
     this.prefsCleanup?.();
     this.prefsCleanup = null;
+    const hasSourcesTab = SITE_VARIANT !== 'reality';
+    if (!hasSourcesTab && this.activeTab === 'sources') this.activeTab = 'settings';
 
     const tabClass = (id: TabId) => `unified-settings-tab${this.activeTab === id ? ' active' : ''}`;
     const prefs = renderPreferences({
@@ -211,7 +213,7 @@ export class UnifiedSettings {
         <div class="unified-settings-tabs" role="tablist" aria-label="Settings">
           <button class="${tabClass('settings')}" data-tab="settings" role="tab" aria-selected="${this.activeTab === 'settings'}" id="us-tab-settings" aria-controls="us-tab-panel-settings">${t('header.tabSettings')}</button>
           <button class="${tabClass('panels')}" data-tab="panels" role="tab" aria-selected="${this.activeTab === 'panels'}" id="us-tab-panels" aria-controls="us-tab-panel-panels">${t('header.tabPanels')}</button>
-          <button class="${tabClass('sources')}" data-tab="sources" role="tab" aria-selected="${this.activeTab === 'sources'}" id="us-tab-sources" aria-controls="us-tab-panel-sources">${t('header.tabSources')}</button>
+          ${hasSourcesTab ? `<button class="${tabClass('sources')}" data-tab="sources" role="tab" aria-selected="${this.activeTab === 'sources'}" id="us-tab-sources" aria-controls="us-tab-panel-sources">${t('header.tabSources')}</button>` : ''}
         </div>
         <div class="unified-settings-tab-panel${this.activeTab === 'settings' ? ' active' : ''}" data-panel-id="settings" id="us-tab-panel-settings" role="tabpanel" aria-labelledby="us-tab-settings">
           ${prefs.html}
@@ -230,7 +232,7 @@ export class UnifiedSettings {
             <button class="panels-reset-layout" title="${t('header.resetLayoutTooltip')}" aria-label="${t('header.resetLayoutTooltip')}">${t('header.resetLayout')}</button>
           </div>
         </div>
-        <div class="unified-settings-tab-panel${this.activeTab === 'sources' ? ' active' : ''}" data-panel-id="sources" id="us-tab-panel-sources" role="tabpanel" aria-labelledby="us-tab-sources">
+        ${hasSourcesTab ? `<div class="unified-settings-tab-panel${this.activeTab === 'sources' ? ' active' : ''}" data-panel-id="sources" id="us-tab-panel-sources" role="tabpanel" aria-labelledby="us-tab-sources">
           <div class="unified-settings-region-wrapper">
             <div class="unified-settings-region-bar" id="usRegionBar"></div>
           </div>
@@ -243,7 +245,7 @@ export class UnifiedSettings {
             <button class="sources-select-all">${t('common.selectAll')}</button>
             <button class="sources-select-none">${t('common.selectNone')}</button>
           </div>
-        </div>
+        </div>` : ''}
       </div>
     `;
 
@@ -262,9 +264,11 @@ export class UnifiedSettings {
 
     this.renderPanelCategoryPills();
     this.renderPanelsTab();
-    this.renderRegionPills();
-    this.renderSourcesGrid();
-    this.updateSourcesCounter();
+    if (hasSourcesTab) {
+      this.renderRegionPills();
+      this.renderSourcesGrid();
+      this.updateSourcesCounter();
+    }
   }
 
   private switchTab(tab: TabId): void {

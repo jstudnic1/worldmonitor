@@ -1029,7 +1029,9 @@ export class DataLoaderManager implements AppModule {
 
     this.ctx.allNews = collectedNews;
     this.ctx.initialLoadComplete = true;
-    mountCommunityWidget();
+    if (SITE_VARIANT !== 'reality') {
+      mountCommunityWidget();
+    }
 
     this.ctx.map?.updateHotspotActivity(this.ctx.allNews);
 

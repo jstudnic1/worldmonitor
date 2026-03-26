@@ -3,6 +3,8 @@
   "buildCommand": "VITE_VARIANT=reality npm run build",
   "crons": [
     { "path": "/api/cron/sync-sreality", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/sync-external-listings", "schedule": "20 6 * * *" },
+    { "path": "/api/cron/sync-reality-idnes-projects", "schedule": "40 6 * * *" },
     { "path": "/api/cron/run-monitor-digests", "schedule": "0 8 * * *" },
     { "path": "/api/cron/run-openclaw-ops-heartbeat", "schedule": "0 9 * * *" }
   ],

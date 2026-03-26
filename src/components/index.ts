@@ -61,3 +61,8 @@ export { MarketStatsPanel } from './MarketStatsPanel';
 export { AlertsPanel } from './AlertsPanel';
 export { CalendarPanel } from './CalendarPanel';
 export { MissingDataPanel } from './MissingDataPanel';
+export { RealityNewsPanel } from './RealityNewsPanel';
+export { MarketAnalysisPanel } from './MarketAnalysisPanel';
+export { LegalRegulationPanel } from './LegalRegulationPanel';
+export { CzechEconomyPanel } from './CzechEconomyPanel';
+export { RealityMonitorPanel } from './RealityMonitorPanel';

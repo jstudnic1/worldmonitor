@@ -204,6 +204,9 @@
     "panelCatDeals": "Transakce a instituce",
     "panelCatGulfMena": "Záliv a MENA",
     "panelCatTradePolicy": "Obchodní politika",
+    "panelCatRealityCore": "Jádro dashboardu",
+    "panelCatRealityIntelligence": "Trh a zprávy",
+    "panelCatRealityOperations": "Back office",
     "downloadApp": "Stáhnout aplikaci",
     "selectRegion": "Vybrat region"
   },
@@ -1064,6 +1067,10 @@
         "centralBank": "Centrální banka",
         "commodityHub": "Komoditní centrum",
         "waterway": "Vodní cesta",
+        "apartment": "Byty",
+        "house": "Domy",
+        "land": "Pozemky",
+        "commercial": "Komerční",
         "highAlert": "Vysoká pohotovost",
         "elevated": "Zvýšená",
         "monitoring": "Monitorování",
@@ -1141,6 +1148,8 @@
         "happiness": "Světové štěstí",
         "speciesRecovery": "Obnova druhů",
         "renewableInstallations": "Čistá energie"
+        ,
+        "realityProperties": "Nemovitosti"
       },
       "tooltip": {
         "earthquake": "Zemětřesení",
@@ -2469,6 +2478,7 @@
     "intelligence": "Inteligence",
     "media": "Média",
     "panels": "Panely",
+    "data": "Data",
     "dataAndCommunity": "Data a komunita",
     "theme": "Motiv",
     "themeDesc": "Automaticky sleduje nastavení systému.",

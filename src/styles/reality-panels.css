@@ -657,6 +657,11 @@
   background: var(--surface-hover);
 }
 
+.property-row.is-selected {
+  background: rgba(68, 255, 136, 0.1);
+  box-shadow: inset 2px 0 0 #44ff88;
+}
+
 .property-row-main {
   flex: 1;
   min-width: 0;
@@ -724,6 +729,21 @@
 /* ----------------------------------------------------------
    Market Stats Panel
    ---------------------------------------------------------- */
+.market-stats-source {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.market-stats-note {
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+
 .market-stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1109,4 +1129,22 @@
 
 .md-field-label {
   color: var(--text-dim);
+}
+
+/* ----------------------------------------------------------
+   Reality Shell Cleanup
+   ---------------------------------------------------------- */
+
+:root[data-variant='reality'] .variant-switcher,
+:root[data-variant='reality'] .download-wrapper,
+:root[data-variant='reality'] .copy-link-btn,
+:root[data-variant='reality'] .fullscreen-btn,
+:root[data-variant='reality'] .header-clock,
+:root[data-variant='reality'] .mobile-menu-variant,
+:root[data-variant='reality'] .map-author-badge {
+  display: none !important;
+}
+
+:root[data-variant='reality'] .deckgl-time-slider {
+  display: none;
 }
