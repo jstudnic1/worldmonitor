@@ -1,7 +1,14 @@
 import { getCorsHeaders } from './_cors.js';
 import { insertRows, isConfigured, queryTable } from './_supabase.js';
+import {
+  buildOpenClawPreviewResponse,
+  formatOpenClawToolLabel,
+  isOpenClawConfigured,
+  resolveAgentMode,
+  runOpenClawConversation,
+} from './_openclaw.js';
 
-export const config = { runtime: 'edge', maxDuration: 30 };
+export const config = { runtime: 'nodejs', maxDuration: 30 };
 
 const SYSTEM_PROMPT = `Jsi AI back-office agent pro českou realitní kancelář "Reality Monitor". Komunikuješ výhradně česky.
 
@@ -21,7 +28,17 @@ Tvoje schopnosti:
 Když uživatel řekne "napiš email" nebo "odešli email", použij send_email.
 Když řekne "naplánuj prohlídku" nebo "přidej do kalendáře", použij create_calendar_event.
 Když řekne "založ lead" nebo "přidej poptávku", použij create_lead.
-Po každé akci navrhi další logický krok.`;
+Po každé akci navrhi další logický krok.
+
+VIZUALIZACE:
+Kdykoli máš data vhodná k vizualizaci (statistiky, trendy, srovnání), VŽDY použij create_chart nebo create_table.
+- Pro trendy v čase: create_chart s chartType "line"
+- Pro srovnání kategorií: create_chart s chartType "bar"
+- Pro detailní přehledy: create_table
+- Pro KPI a souhrnné metriky: create_metrics
+- Pro e-mailové koncepty: create_email_draft (uživatel pak může rovnou odeslat)
+- Pro prezentace: create_slides
+Nikdy nepiš tabulky jako text — vždy použij create_table. Nikdy nepiš čísla do odstavce — použij create_metrics.`;
 
 const TOOLS = [
   {
@@ -229,7 +246,166 @@ const TOOLS = [
       },
     },
   },
+  // ─── Artifact/Visualization Tools ────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'create_chart',
+      description: 'Vytvoř interaktivní graf (sloupcový nebo čárový). Použij VŽDY když máš numerická data k vizualizaci.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Nadpis grafu' },
+          chartType: { type: 'string', enum: ['bar', 'line'], description: 'Typ grafu: bar pro srovnání, line pro trendy' },
+          labels: { type: 'array', items: { type: 'string' }, description: 'Popisky osy X (kategorie nebo časové období)' },
+          series: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'Název datové řady' },
+                values: { type: 'array', items: { type: 'number' }, description: 'Hodnoty' },
+              },
+              required: ['name', 'values'],
+            },
+            description: 'Datové řady (jedna nebo více)',
+          },
+          unit: { type: 'string', description: 'Jednotka (např. "Kč", "ks", "%")' },
+        },
+        required: ['title', 'chartType', 'labels', 'series'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_table',
+      description: 'Vytvoř přehlednou tabulku. Použij VŽDY když chceš zobrazit strukturovaná data.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Nadpis tabulky' },
+          columns: { type: 'array', items: { type: 'string' }, description: 'Názvy sloupců' },
+          rows: {
+            type: 'array',
+            items: { type: 'array', items: { type: 'string' } },
+            description: 'Řádky tabulky (pole polí)',
+          },
+        },
+        required: ['title', 'columns', 'rows'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_metrics',
+      description: 'Zobraz klíčové metriky (KPI karty). Použij pro souhrnná čísla.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Nadpis sekce metrik' },
+          metrics: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                label: { type: 'string', description: 'Název metriky' },
+                value: { type: 'string', description: 'Hodnota (formátovaná)' },
+                tone: { type: 'string', enum: ['neutral', 'positive', 'warning', 'critical'], description: 'Vizuální styl' },
+              },
+              required: ['label', 'value'],
+            },
+          },
+        },
+        required: ['title', 'metrics'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_email_draft',
+      description: 'Vytvoř koncept e-mailu s tlačítkem pro odeslání. Použij když uživatel chce napsat e-mail.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Interní popis (např. "E-mail pro klienta Nováka")' },
+          to: { type: 'string', description: 'Jméno nebo e-mail příjemce' },
+          subject: { type: 'string', description: 'Předmět' },
+          body: { type: 'string', description: 'Text e-mailu' },
+          suggestedSlots: { type: 'array', items: { type: 'string' }, description: 'Navrhované termíny (volitelné)' },
+        },
+        required: ['subject', 'body'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_slides',
+      description: 'Vytvoř prezentaci (slidy). Použij pro reporty vedení nebo shrnutí.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Název prezentace' },
+          slides: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                title: { type: 'string', description: 'Nadpis slidu' },
+                bullets: { type: 'array', items: { type: 'string' }, description: 'Odrážky na slidu' },
+              },
+              required: ['title', 'bullets'],
+            },
+          },
+        },
+        required: ['title', 'slides'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_checklist',
+      description: 'Vytvoř checklist s úkoly a prioritami.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Nadpis checklistu' },
+          items: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                label: { type: 'string', description: 'Text úkolu' },
+                detail: { type: 'string', description: 'Doplňující detail' },
+                status: { type: 'string', enum: ['info', 'warning', 'critical'], description: 'Priorita' },
+              },
+              required: ['label'],
+            },
+          },
+        },
+        required: ['title', 'items'],
+      },
+    },
+  },
 ];
+
+const ARTIFACT_TOOL_NAMES = new Set([
+  'create_chart', 'create_table', 'create_metrics',
+  'create_email_draft', 'create_slides', 'create_checklist',
+]);
+
+const ARTIFACT_KIND_MAP = {
+  create_chart: 'chart',
+  create_table: 'table',
+  create_metrics: 'metrics',
+  create_email_draft: 'email',
+  create_slides: 'slides',
+  create_checklist: 'checklist',
+};
 
 const DEMO_PROPERTIES = [
   {
@@ -658,6 +834,42 @@ function formatMonitorChannel(channel, target) {
   if (normalized.includes('email') && target) return `Dashboard + e-mail (${target})`;
   if (normalized.includes('email')) return 'Dashboard + e-mail';
   return 'Dashboard';
+}
+
+function buildOpenClawTraceResult(toolTrace, model, runtime) {
+  const uniqueTools = [...new Set((toolTrace || []).filter(Boolean))];
+  return {
+    title: 'OpenClaw Agent Run',
+    summary: uniqueTools.length > 0
+      ? 'Dotaz zpracoval OpenClaw orchestration layer nad interními nástroji Reality Monitor.'
+      : 'Dotaz zpracoval OpenClaw orchestration layer bez potřeby interních nástrojů.',
+    source: 'openclaw',
+    artifacts: [
+      {
+        kind: 'metrics',
+        title: 'Běh agenta',
+        metrics: [
+          { label: 'Runtime', value: runtime || 'OpenClaw' },
+          { label: 'Model', value: model || 'gateway-default' },
+          { label: 'Použité nástroje', value: String(uniqueTools.length) },
+        ],
+      },
+      ...(uniqueTools.length > 0
+        ? [{
+            kind: 'checklist',
+            title: 'Provedené kroky',
+            items: uniqueTools.map((toolName) => ({
+              label: formatOpenClawToolLabel(toolName),
+              detail: toolName,
+              status: 'info',
+            })),
+          }]
+        : []),
+    ],
+    nextSteps: uniqueTools.length > 0
+      ? ['Pokud chcete, mohu navázat dalším krokem nebo akci rovnou provést.']
+      : ['Pro akčnější workflow zkuste požadavek rozšířit o konkrétní úkol nebo schválení.'],
+  };
 }
 
 function rangesOverlap(startA, endA, startB, endB) {
@@ -1457,13 +1669,64 @@ export default async function handler(req) {
     const body = await req.json();
     const userMessages = Array.isArray(body.messages) ? body.messages : [];
     const latestPrompt = findLastUserPrompt(userMessages);
-    const structuredResponse = latestPrompt ? await maybeHandleStructuredWorkflow(latestPrompt) : null;
+    const agentMode = resolveAgentMode(body.agentMode);
+    const structuredResponse = latestPrompt && agentMode !== 'openclaw'
+      ? await maybeHandleStructuredWorkflow(latestPrompt)
+      : null;
 
     if (structuredResponse) {
       return new Response(JSON.stringify(structuredResponse), {
         status: 200,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
+    }
+
+    if (agentMode === 'openclaw') {
+      if (!isOpenClawConfigured()) {
+        return new Response(JSON.stringify(buildOpenClawPreviewResponse(latestPrompt)), {
+          status: 200,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
+      try {
+        const openClawResponse = await runOpenClawConversation({
+          instructions: SYSTEM_PROMPT,
+          messages: userMessages,
+          tools: TOOLS,
+          executeTool,
+          maxRounds: MAX_TOOL_ROUNDS,
+          metadata: {
+            app: 'reality-worldmonitor',
+            workflow: 'chat',
+          },
+        });
+
+        return new Response(JSON.stringify({
+          content: openClawResponse.content,
+          result: buildOpenClawTraceResult(openClawResponse.toolTrace, openClawResponse.model, openClawResponse.runtime),
+        }), {
+          status: 200,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({
+          content: `OpenClaw běh selhal: ${getErrorMessage(err)}. Přepněte do režimu Auto nebo OpenRouter, případně zkontrolujte Gateway.`,
+          result: {
+            title: 'OpenClaw Error',
+            summary: 'Gateway odpověděla chybou nebo nebyla dosažitelná.',
+            source: 'openclaw-preview',
+            artifacts: [],
+            nextSteps: [
+              'Zkontrolujte OPENCLAW_BASE_URL a OPENCLAW_GATEWAY_TOKEN.',
+              'Pokud potřebujete pokračovat hned, použijte režim Auto nebo OpenRouter.',
+            ],
+          },
+        }), {
+          status: 200,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -1480,6 +1743,9 @@ export default async function handler(req) {
       { role: 'system', content: SYSTEM_PROMPT },
       ...userMessages,
     ];
+
+    // Accumulate artifacts from create_chart / create_table / etc.
+    const collectedArtifacts = [];
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -1529,6 +1795,18 @@ export default async function handler(req) {
             fnArgs = {};
           }
 
+          // Check if this is an artifact-generating tool
+          if (ARTIFACT_TOOL_NAMES.has(fnName)) {
+            const kind = ARTIFACT_KIND_MAP[fnName] || 'chart';
+            collectedArtifacts.push({ kind, ...fnArgs });
+            messages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: JSON.stringify({ success: true, message: `Artefakt "${fnArgs.title || kind}" vytvořen a zobrazen uživateli.` }),
+            });
+            continue;
+          }
+
           let result;
           try {
             result = await executeTool(fnName, fnArgs);
@@ -1546,13 +1824,39 @@ export default async function handler(req) {
       }
 
       const content = message.content || 'Omlouvám se, nepodařilo se vygenerovat odpověď.';
+
+      // If artifacts were collected, wrap in structured result
+      if (collectedArtifacts.length > 0) {
+        return new Response(JSON.stringify({
+          content,
+          result: {
+            title: 'Výsledek',
+            source: 'ai-agent',
+            artifacts: collectedArtifacts,
+          },
+        }), {
+          status: 200,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+
       return new Response(JSON.stringify({ content }), {
         status: 200,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify({ content: 'Omlouvám se, dotaz byl příliš složitý. Zkuste jej zkrátit nebo zpřesnit.' }), {
+    // Max rounds exceeded — still return any collected artifacts
+    const fallbackContent = collectedArtifacts.length > 0
+      ? 'Zde jsou výsledky analýzy:'
+      : 'Omlouvám se, dotaz byl příliš složitý. Zkuste jej zkrátit nebo zpřesnit.';
+
+    return new Response(JSON.stringify({
+      content: fallbackContent,
+      ...(collectedArtifacts.length > 0 ? {
+        result: { title: 'Výsledek', source: 'ai-agent', artifacts: collectedArtifacts },
+      } : {}),
+    }), {
       status: 200,
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
